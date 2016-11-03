@@ -1,5 +1,5 @@
 function [spectraMean,clickAssign,clustSizes,spectraHolder,...
-    clickAssignAll] = cluster_clicks(specClickTrunc,p,javaPathVar,...
+    clickAssignAll] = cluster_clicks(specClickTf,p,javaPathVar,...
     classPathVar,toolkitPath)
 
 clickAssign = [];
@@ -23,6 +23,7 @@ wcorTF = 0; % flag for weighted corrlation.
 % specClickTf_SlopeNorm = (specClickTrunc - slopeMat);
 
 % Normalize clicks on 0-1 scale
+specClickTrunc = specClickTf;%(:,p.stIdx:p.edIdx);
 minSSsection = min(specClickTrunc,[],2);
 specClickTf_minNorm = (specClickTrunc - ...
      minSSsection(:,ones(1,size(specClickTrunc,2))));
