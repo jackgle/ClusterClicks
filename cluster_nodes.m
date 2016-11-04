@@ -50,7 +50,7 @@ fclose(fid);
 javaPathVar = 'C:\Program Files\Java\jre6\bin\java.exe';
 classPathVar = ' E:\workspace\ClusterGephi_sio\bin;';
 toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolkit.jar';
-[status,result] = system(sprintf('"%s" -Xms512m -Xmx6144m -Dfile.encoding=Cp1252 -classpath %s%s ClusterGephi.ClusterMain "%s" "%g" "%g"',...
+[status,result] = system(sprintf('"%s" -Xms512m -Xmx6144m -Dfile.encoding=Cp1252 -classpath %s;%s ClusterGephi.ClusterMain "%s" "%g" "%g"',...
     javaPathVar,classPathVar,toolkitPath,file2Write,modularity,pgRnkPrctile));
 if status~=0
     error(result)

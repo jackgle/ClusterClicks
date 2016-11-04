@@ -111,7 +111,7 @@ fprintf(fid, '}\n');
 fclose(fid);
 
 disp('clustering')
-[status,result] = system(sprintf('"%s" -Xms512m -Xmx20000m -Dfile.encoding=Cp1252 -classpath %s%s ClusterGephi.ClusterMain "%s" "%g" "%g"',...
+[status,result] = system(sprintf('"%s" -Xms512m -Xmx20000m -Dfile.encoding=Cp1252 -classpath %s;%s ClusterGephi.ClusterMain "%s" "%g" "%g"',...
     javaPathVar,classPathVar,toolkitPath,file2Write,p.modular,p.pgThresh/100));
 disp('done clustering')
 if status~=0
