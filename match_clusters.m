@@ -1,20 +1,27 @@
 clearvars
-siteStr = 'MC01';
+siteStr = 'MC';
 savDir = 'F:\GOM_clickTypePaper_detections\TPWS\ClusterOct2016';
-inFile = 'F:\GOM_clickTypePaper_detections\TPWS\ClusterOct2016\MC01_disk12_clusters_PG25_PR95_MIN100_MOD0_typesHR.mat';
+inFile = 'F:\GOM_clickTypePaper_detections\TPWS\ClusterOct2016\MC03_disk14_clusters_PG0_PR95_MIN100_MOD0_noFP_typesHR.mat';
 load(inFile);
 
 nTemplates = size(Tfinal,1);
-cMax = .5;
-visualize = 1;
+cMax = .65;
+visualize = 0;
 
-autoScore = cell(size(tInt,1),nTemplates);
+autoScore = cell(size(tInt,1),1);
 autoID = cell(size(tInt,1),nTemplates);
 labeledCountsAll = zeros(size(tInt,1),nTemplates+1);
 pSpecAll = cell(size(tInt,1),1);
 cAll = zeros(size(tInt,1),1);
 
 %%
+specCentroids = [];
+iciCentroids = nan(size(Tfinal,1),1);
+for iTF = 1:size(Tfinal,1)
+    iciCentroids(iTF) = mean(Tfinal{iTF,4});
+    specCentroids(iTF,:) = mean(Tfinal{iTF,3});
+end
+
 minBinIdx = 1;
 for i1 = 1:length(sumSpec)
     % normalize mean spectra for this bin and compute diff
@@ -37,19 +44,25 @@ for i1 = 1:length(sumSpec)
     
     % iterate over spectra in bin
     for iS = 1:size(specClickTf_norm_short,1)
-        % iterate over possible clusters
-        comboDist = zeros(size(Tfinal,1),1);
-        for iTF = 1:size(Tfinal,1)
-            % compute spectral similarities
-            specCorr = exp(-pdist2(specClickTf_norm_short(iS,:),...
-                Tfinal{iTF,3},'correlation'));
-            % compute modal ici similarities
-            %iciModeDist = exp(-pdist2(dTTmatNorm(iS,1:maxICI),Tfinal{iTF,2},'euclidean'));
-            iciModeDist = exp(-pdist2(iciMode(iS),Tfinal{iTF,4}','euclidean'));
-            % compute combined similarity scores
-            comboDistSort = specCorr.*iciModeDist;
-            comboDist(iTF) = nanmean(comboDistSort);
-        end
+        iciDist = exp(-pdist2(iciMode(iS),iciCentroids,'euclidean'));
+        specCorr = exp(-pdist2(specClickTf_norm_short(iS,:),...
+                specCentroids,'correlation'));
+        comboDist = specCorr.*iciDist;
+
+%         % iterate over possible clusters
+%         comboDist = zeros(size(Tfinal,1),1);
+%         
+%         for iTF = 1:size(Tfinal,1)
+%             % compute spectral similarities
+%             specCorr = exp(-pdist2(specClickTf_norm_short(iS,:),...
+%                 Tfinal{iTF,3},'correlation'));
+%             % compute modal ici similarities
+%             %iciModeDist = exp(-pdist2(dTTmatNorm(iS,1:maxICI),Tfinal{iTF,2},'euclidean'));
+%             iciModeDist = exp(-pdist2(iciMode(iS),Tfinal{iTF,4}','euclidean'));
+%             % compute combined similarity scores
+%             comboDistSort = specCorr.*iciModeDist;
+%             comboDist(iTF) = nanmean(comboDistSort);
+%         end
         [C,I] = max(comboDist);
         
         if C < cMax
@@ -85,6 +98,9 @@ for i1 = 1:length(sumSpec)
             end
             title(gca,sprintf('Overall Score %0.2f',C))
             xlim([0,max(p.barInt)])
+            if C < cMax
+                1;
+            end
         end
     end
     pSpecAll(i1,1) = percSpec(i1);
@@ -94,7 +110,6 @@ end
 
 
 save(fullfile(savDir,sprintf('All%s_autoMatch',siteStr)),'siteStr',...
-    'labeledCountsAll','specStore','pSpecAll','autoScore','iciScoreVec',...
-    'tAll','cAll','muF','sigmaF','nTemplates','myCounter','Tfinal')
+    'labeledCountsAll','pSpecAll','autoScore','nTemplates','Tfinal')
 
 
