@@ -6,9 +6,10 @@
 
 clearvars
 
-siteName = 'HAT_A_05';
-inFileName = 'D:\HAT05A_metadata\TPWS\ClusterOct2016\HAT_A_05_disk01a_Delphin_clusters_PG0_PR95_MIN25_MOD0_noFP.mat';
-outDir = 'D:\HAT05A_metadata\TPWS\ClusterOct2016\';
+siteName = 'MC01-03';
+inDir = 'F:\GOM_clickTypePaper_detections\TPWS\MC01_02_03_TPWS\Cluster2016\';
+inFile = 'MC03_disk14_clusters_PG0_PR95_MIN100_MOD0_noFP.mat';
+outDir = 'F:\GOM_clickTypePaper_detections\TPWS\ClusterOct2016\';
 
 %%%% Similarity %%%%
 % choose if you want to include ICI **OR** click rate in similarity caculation
@@ -29,12 +30,15 @@ pgThresh = 0; % Percentile of nodes to remove from metwork using PageRank weight
 % pruned out.
 modular = 0; % If you use a number other than 0, modularity algorithm will 
 % be used instead of chinese whispers. Not recommended.
-maxClust = 1000;% maximum number of bins to cluster. If you have more than
+maxClust = 12000;% maximum number of bins to cluster. If you have more than
 % this, a random subset of this size will be selected.
+
+% Number of clusterings to use for evidence accumulation
+N = 10; % bigger is theoretically more robust, but takes longer
 
 %%%% Plotting %%%%
 subPlotSet = 1; % Set to 1 if you want plots with each click type as a subplot
-indivPlots = 1; % Set to 1 if you want separate plots for each click type
+indivPlots = 0; % Set to 1 if you want separate plots for each click type
 
 %% 
 % Check for output directory
@@ -43,6 +47,7 @@ if ~exist(outDir,'dir')
 end
 cd(outDir)
 
+inFileName = fullfile(inDir,inFile);
 % load data
 load(inFileName)
 
@@ -51,7 +56,7 @@ load(inFileName)
 % Put click spectra into a matrix
 sumSpecMat = vertcat(sumSpec{:});
 % find pairwise distances between spectra
-[specDist,~,~,normSpec] = spectra_dist(sumSpecMat,stIdx,edIdx);
+[specDist,~,~,normSpec,diffNormSpec] = spectra_dist(sumSpecMat,stIdx,edIdx);
 
 %%% Normalize ICIs
 % move ICI distributions into a matrix
@@ -68,12 +73,12 @@ cRateNorm1 = cRateMat./repmat(sum(cRateMat,2),1,size(cRateMat,2));
 cRateNorm = cRateNorm1./repmat(max(cRateNorm1,[],2),1,size(cRateMat,2));
 
 if iciTF % if true, use ici distributions for similarity calculations
-    [iciDist,~,~] = ici_dist_mode(dTTmatNorm, p.barInt,minICI);    
+    [iciDist,~,~,iciModes] = ici_dist_mode(dTTmatNorm, p.barInt,minICI);    
     compDist = squareform(specDist.*iciDist,'tomatrix');
     disp('Clustering on modal ICI and spectral correlations')
 elseif cRateTF 
     % use click rate distributions for similarity calculations
-    [cRateDist,~,~] = ici_dist_mode(cRateNorm, p.barRate,1);
+    [cRateDist,~,~,iciModes] = ici_dist_mode(cRateNorm, p.barRate,1);
     compDist = squareform(specDist.*cRateDist,'tomatrix');
     disp('Clustering on modal click rate and spectral correlations')
 else
@@ -82,25 +87,53 @@ else
     disp('Clustering on spectral correlations') 
 end
 
-%% Select random subset if needed
-if size(compDist,1)>maxClust
-    excludedIn = sort(randperm(length(dTTmatNorm),maxClust));
-    fprintf('Max number of bins exceeded. Selecting random subset of %d\n',maxClust)
-else
-    excludedIn = 1:length(dTTmatNorm);
-end
-%% Cluster
+%% Cluster N times for evidence accumulation/robustness
 tempN = ceil(sqrt(length(specDist)*2));
-[nodeAssign,excludedOut,rankAssign] = cluster_nodes(compDist(excludedIn,excludedIn),...
-    minClust,pruneThr,modular,pgThresh);
-
-% Recover from random permutation
-iL = 1;
-nodeSet = {};
-for iA = 1:length(nodeAssign)
-    nodeSet{iA} = excludedIn(nodeAssign{iL});
-    iL = iL+1;
+CoMat = zeros(tempN,tempN);
+for iEA = 1:N
+    fprintf('Clustering for evidence accumulation: %d of %d\n',iEA,N)
+   
+    % Select random subset if needed
+    if size(compDist,1)>maxClust
+        excludedIn = sort(randperm(length(dTTmatNorm),maxClust));
+        fprintf('Max number of bins exceeded. Selecting random subset of %d\n',maxClust)
+    else
+        excludedIn = 1:length(dTTmatNorm);
+    end
+    
+    % cluster
+    [nodeAssign,excludedOut,rankAssign] = cluster_nodes(compDist(excludedIn,excludedIn),...
+        minClust,pruneThr,modular,pgThresh);
+    
+    % Recover from random permutation
+    iL = 1;
+    nodeSet = {};
+    for iA = 1:length(nodeAssign)
+        nodeSet{iA} = excludedIn(nodeAssign{iL});
+        % update co-association matrix (Fred and Jain 2005)
+        CoMat(nodeSet{iA},nodeSet{iA}) = CoMat(nodeSet{iA},nodeSet{iA})+ 1/N;
+        iL = iL+1;
+    end
+    nList{iEA} = excludedIn;
+    ka(iEA,1) = length(nodeAssign);
+    naiItr{iEA} = nodeSet;
+    
+   
 end
+
+% Best of K partitions based on NMI filkov and Skiena 2004
+% Compute NMI
+[NMIList] = compute_NMI(nList,ka,naiItr);
+% the one with the highest mean score is the best 
+[bokVal,bokIdx] = max(sum(NMIList)./(size(NMIList,1)-1)); % account for empty diagonal.
+
+nodeSet = naiItr{bokIdx};
+% % Final cluster using Co-assoc mat.
+% disp('Clustering using accumulated evidence')
+% compDist2 = compDist;
+% compDist2(find(CoMat<1))=0;
+% [nodeSet,excludedOut,rankAssign] = cluster_nodes(compDist2,...
+%        minClust,pruneThr,modular,pgThresh);
 
 %% calculate means, percentiles, std devs
 for iF = 1:length(nodeSet)
@@ -129,8 +162,8 @@ if subPlotSet
         subplot(n1,m1,iF)
         hold on
         plot(f,spectraMeanSet(iF,:),'-k','lineWidth',2)
-        xlim([min(f),max(f)])
-        legend(num2str(size(nodeSet{iF},1)),'location','Southeast')
+        xlim([min(f),65])
+        legend(num2str(size(nodeSet{iF},2)),'location','Southeast')
         plot(f,specPrctile{iF},'--k','lineWidth',2)
         grid on
         
@@ -138,7 +171,7 @@ if subPlotSet
         subplot(n1,m1,iF)
         imagesc(1:length(nodeSet{iF}),f,normSpec(nodeSet{iF},:)')
         set(gca,'ydir','normal')
-        ylim([min(f),max(f)])
+        ylim([min(f),65])
         
         figure(80) % plot ICI distributions
         subplot(n1,m1,iF)
@@ -153,6 +186,7 @@ if subPlotSet
         errorbar(p.barRate,cRateMean(iF,:),zeros(size(cRateStd(iF,:))),cRateStd(iF,:),'.k')
         hold on
         hbR = bar(p.barRate,cRateMean(iF,:),1);
+        xlim([0,max(p.barRate)])
         ylim([0,1])
 end
 
@@ -264,8 +298,15 @@ end
 %%
 
 for iTF = 1:length(nodeSet)
-    Tfinal{iTF,1} = sumSpecMat(nodeSet{iTF},:);
-    Tfinal{iTF,2} = dTTmatNorm(nodeSet{iTF},:);
+    Tfinal{iTF,1} = sumSpecMat(nodeSet{iTF},:);% all mean spectra 
+    Tfinal{iTF,2} = dTTmatNorm(nodeSet{iTF},:);% ici ditributions
+    Tfinal{iTF,3} = diffNormSpec(nodeSet{iTF},:); % 1st diff spectra
+    Tfinal{iTF,4} = iciModes(nodeSet{iTF}); % modal ICI vals
+    Tfinal{iTF,5} =  spectraMeanSet(iTF,:); % mean spectrum
 end
 [~,inFileStub,~] = fileparts(inFileName);
-save(fullfile(outDir,[inFileStub,'_typesHR']))
+save(fullfile(outDir,[inFileStub,'_typesHR']),'Tfinal','nodeSet','NMIList',...
+'p','maxClust','minClust','maxICI','barAdj','f','siteName','nList','ka','naiItr',...
+'excludedOut','CoMat','iciTF','cRateTF','stIdx','edIdx','maxICI','minICI',...
+'pruneThr','pgThresh','modular','N','cInt','dTT','sumSpec','tInt',...
+'percSpec','nSpec','clickRate','normSpec','dTTmatNorm','cRateNorm','inFileName')

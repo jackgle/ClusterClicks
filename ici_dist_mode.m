@@ -1,4 +1,4 @@
-function [distClickE,rows1,cols1] = ici_dist_mode(iciMat,barInt,minBinIdx)
+function [distClickE,rows1,cols1,iciMode] = ici_dist_mode(iciMat,barInt,minBinIdx)
 % iciNorm = iciMat./repmat(sum(iciMat,2),1,size(iciMat,2));
 
 [~,iciModeIdx] = max(iciMat(:,minBinIdx:end),[],2);
@@ -20,5 +20,5 @@ for itrA = 1:size(iciMode,1)-1
 end
 distClick = pdist(iciMode','euclidean');
 
-distClickE = (exp(-distClick));
+distClickE = exp(-distClick);
 

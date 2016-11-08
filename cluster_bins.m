@@ -24,24 +24,24 @@ clearvars
 
 %%% Java/Gephi toolkit setup
 javaPathVar = 'C:\Program Files\Java\jre6\bin\java.exe';
-classPathVar = ' E:\workspace\ClusterGephi_sio\bin;';
+classPathVar = ' E:\workspace\ClusterGephi_sio\bin';
 toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolkit.jar';
 
 %%% set inputs and setting values
-siteName = 'WAT_NC'; % First few letters of TPWS file names
+siteName = 'GC'; % First few letters of TPWS file names
 
 % directory where those TPWS files live
-inDir = 'G:\DCL\WAT_NC_TPWS';
-outDir = 'G:\DCL\WAT_NC_TPWS\ClusterOct2016';
+inDir = 'F:\GOM_clickTypePaper_detections\TPWS\GC01_02_03_TPWS';
+outDir = 'F:\GOM_clickTypePaper_detections\TPWS\GC01_02_03_TPWS\Cluster2016';
 
 %%% Clustering parameter choices
 p.minClust = 100; % minimum number of clicks required for a cluster to be retained.
 % Think about how fast your species click, group sizes, and how many clicks they make
 % per N minutes...
-p.pruneThr = 95; % Percentage of edges between nodes that you want to prune.
+p.pruneThr = 90; % Percentage of edges between nodes that you want to prune.
 % Pruning speeds up clustering, but can result in isolation (therefore
 % loss) of rare click types.
-p.pgThresh = 25; % Percentile of nodes to remove from metwork using PageRank weights.
+p.pgThresh = 0; % Percentile of nodes to remove from metwork using PageRank weights.
 % e.g. If you use 25, nodes with PR in the lowest 25th percentile will be
 % pruned out.
 p.modular = 0; % if you use a number other than 0, modularity algorithm will be used
@@ -50,7 +50,7 @@ p.modular = 0; % if you use a number other than 0, modularity algorithm will be 
 % communities detected. 1 = no bias, >1 bias toward fewer communities, <1,
 % bias toward more communities.
 
-p.plotFlag = 0; % Want plots? Turn this off for large jobs, but useful for
+p.plotFlag = 1; % Want plots? Turn this off for large jobs, but useful for
 % seeing how your clusters are coming out when choosing parameters above.
 
 %%% Frequencies you want to compare clicks across:
@@ -64,7 +64,7 @@ p.edIdx = 81; % index of end freq
 p.barInt = 0:.01:.5; % ICI bins in seconds (minICI:resolution:maxICI)
 p.barRate = 1:1:30; % click rate in clicks per second (minRate:resolution:maxRate)
 
-p.diff = 1;% compare first derivative of spectra if 1. If 0 spectra will be compared normally.
+p.diff = 0;% compare first derivative of spectra if 1. If 0 spectra will be compared normally.
 
 % Option to enforce a minimum recieved level (dB peak to peak), and only
 % cluster high-amplitude clicks, which tend to have cleaner spectra.
@@ -110,7 +110,7 @@ for i0 = 1:length(fdNames)
     load(fdNames(i0).name,'zFD');
     fdAll = [fdAll;zFD];
 end
-
+fkeep = [];
 for itr = 1:length(ttppNames)
     thisFile = ttppNames(itr).name;
     MTT = [];
@@ -119,13 +119,21 @@ for itr = 1:length(ttppNames)
     zFD = [];
     % FDname = strrep(thisFile,'TPWS','FD');
     load(thisFile,'MPP','MTT','MSP','f')
+    if ~isempty(f)
+        fkeep = f;
+    elseif isempty(f) && ~isempty(fkeep)
+        f = fkeep;
+    else
+        disp('Error: Missing frequency vector in input file.')
+        break
+    end
     % load(FDname,'zFD')
     % make output file name that incorporates settings:
     if p.diff
-        outName = strrep(thisFile,'TPWS1',sprintf('clusters_diff_PG%d_PR%d_MIN%d_MOD%d_PPmin%d',...
+        outName = strrep(thisFile,'TPWS1',sprintf('clusters_diff_PG%d_PR%d_MIN%d_MOD%d_PPmin%d_noFP',...
             p.pgThresh, p.pruneThr, p.minClust, p.modular,p.ppThresh));
     else
-        outName = strrep(thisFile,'TPWS1',sprintf('clusters_PG%d_PR%d_MIN%d_MOD%d',...
+        outName = strrep(thisFile,'TPWS1',sprintf('clusters_PG%d_PR%d_MIN%d_MOD%d_noFP',...
             p.pgThresh, p.pruneThr, p.minClust, p.modular));
     end
     % remove false positive clicks
