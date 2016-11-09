@@ -28,11 +28,11 @@ classPathVar = ' E:\workspace\ClusterGephi_sio\bin';
 toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolkit.jar';
 
 %%% set inputs and setting values
-siteName = 'GC'; % First few letters of TPWS file names
+siteName = 'GofMX_DC'; % First few letters of TPWS file names
 
 % directory where those TPWS files live
-inDir = 'F:\GOM_clickTypePaper_detections\TPWS\GC01_02_03_TPWS';
-outDir = 'F:\GOM_clickTypePaper_detections\TPWS\GC01_02_03_TPWS\Cluster2016';
+inDir = 'F:\GOM_clickTypePaper_detections\TPWS\DC02_03_TPWS';
+outDir = 'F:\GOM_clickTypePaper_detections\TPWS\DC02_03_TPWS\Cluster2016';
 
 %%% Clustering parameter choices
 p.minClust = 100; % minimum number of clicks required for a cluster to be retained.
@@ -50,7 +50,7 @@ p.modular = 0; % if you use a number other than 0, modularity algorithm will be 
 % communities detected. 1 = no bias, >1 bias toward fewer communities, <1,
 % bias toward more communities.
 
-p.plotFlag = 1; % Want plots? Turn this off for large jobs, but useful for
+p.plotFlag = 0; % Want plots? Turn this off for large jobs, but useful for
 % seeing how your clusters are coming out when choosing parameters above.
 
 %%% Frequencies you want to compare clicks across:
@@ -111,7 +111,7 @@ for i0 = 1:length(fdNames)
     fdAll = [fdAll;zFD];
 end
 fkeep = [];
-for itr = 1:length(ttppNames)
+for itr = 17:length(ttppNames)
     thisFile = ttppNames(itr).name;
     MTT = [];
     MPP = [];
@@ -130,10 +130,10 @@ for itr = 1:length(ttppNames)
     % load(FDname,'zFD')
     % make output file name that incorporates settings:
     if p.diff
-        outName = strrep(thisFile,'TPWS1',sprintf('clusters_diff_PG%d_PR%d_MIN%d_MOD%d_PPmin%d_noFP',...
+        outName = strrep(thisFile,'TPWS1',sprintf('clusters_diff_PG%d_PR%d_MIN%d_MOD%d_PPmin%d',...
             p.pgThresh, p.pruneThr, p.minClust, p.modular,p.ppThresh));
     else
-        outName = strrep(thisFile,'TPWS1',sprintf('clusters_PG%d_PR%d_MIN%d_MOD%d_noFP',...
+        outName = strrep(thisFile,'TPWS1',sprintf('clusters_PG%d_PR%d_MIN%d_MOD%d',...
             p.pgThresh, p.pruneThr, p.minClust, p.modular));
     end
     % remove false positive clicks

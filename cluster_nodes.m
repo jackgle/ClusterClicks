@@ -1,13 +1,11 @@
 function [nodeAssign,excluded,rankAssign] = cluster_nodes(distMat,...
-    minClust,thr,modularity,pgRnkPrctile)
+    minClust,thr,modularity,pgRnkPrctile,javaPathVar,classPathVar,toolkitPath)
 excluded = [];
 nodeAssign = {};
-
 filename = 'io_test4.csv';
 
 tempN = size(distMat,1);
 offaxN = ((tempN.^2)-tempN)./2;
-
 rows1 = zeros(offaxN, 1);
 cols1 = zeros(offaxN, 1);
 distMatL = zeros(offaxN, 1);
@@ -47,9 +45,6 @@ end
 fprintf(fid, '}\n');
 fclose(fid);
 
-javaPathVar = 'C:\Program Files\Java\jre6\bin\java.exe';
-classPathVar = ' E:\workspace\ClusterGephi_sio\bin;';
-toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolkit.jar';
 [status,result] = system(sprintf('"%s" -Xms512m -Xmx6144m -Dfile.encoding=Cp1252 -classpath %s;%s ClusterGephi.ClusterMain "%s" "%g" "%g"',...
     javaPathVar,classPathVar,toolkitPath,file2Write,modularity,pgRnkPrctile));
 if status~=0

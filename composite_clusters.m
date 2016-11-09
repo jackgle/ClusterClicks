@@ -6,10 +6,15 @@
 
 clearvars
 
-siteName = 'MC01-03';
-inDir = 'F:\GOM_clickTypePaper_detections\TPWS\MC01_02_03_TPWS\Cluster2016\';
-inFile = 'MC03_disk14_clusters_PG0_PR95_MIN100_MOD0_noFP.mat';
-outDir = 'F:\GOM_clickTypePaper_detections\TPWS\ClusterOct2016\';
+siteName = 'GC01-03';
+inDir = 'F:\GOM_clickTypePaper_detections\TPWS\GC01_02_03_TPWS\Cluster2016\';
+inFile = 'GC03_disk14_clusters_PG0_PR90_MIN100_MOD0.mat';
+outDir = 'F:\GOM_clickTypePaper_detections\TPWS\GC01_02_03_TPWS\Cluster2016\';
+
+% Gephi and Java paths:
+javaPathVar = 'C:\Program Files\Java\jre6\bin\java.exe';
+classPathVar = ' E:\workspace\ClusterGephi_sio\bin;';
+toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolkit.jar';
 
 %%%% Similarity %%%%
 % choose if you want to include ICI **OR** click rate in similarity caculation
