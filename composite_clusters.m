@@ -6,14 +6,14 @@
 
 clearvars
 
-siteName = 'GC01-03';
-inDir = 'F:\GOM_clickTypePaper_detections\TPWS\GC01_02_03_TPWS\Cluster2016\';
-inFile = 'GC03_disk14_clusters_PG0_PR90_MIN100_MOD0.mat';
-outDir = 'F:\GOM_clickTypePaper_detections\TPWS\GC01_02_03_TPWS\Cluster2016\';
+siteName = 'DC02-03';
+inDir = 'F:\GOM_clickTypePaper_detections\TPWS\DC02_03_TPWS\Cluster2016\';
+inFile = 'GofMX_DC03_disk06_Delphin_clusters_PG0_PR90_MIN100_MOD0.mat';
+outDir = 'F:\GOM_clickTypePaper_detections\TPWS\DC02_03_TPWS\Cluster2016\';
 
 % Gephi and Java paths:
 javaPathVar = 'C:\Program Files\Java\jre6\bin\java.exe';
-classPathVar = ' E:\workspace\ClusterGephi_sio\bin;';
+classPathVar = ' E:\workspace\ClusterGephi_sio\bin';
 toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolkit.jar';
 
 %%%% Similarity %%%%
@@ -108,7 +108,7 @@ for iEA = 1:N
     
     % cluster
     [nodeAssign,excludedOut,rankAssign] = cluster_nodes(compDist(excludedIn,excludedIn),...
-        minClust,pruneThr,modular,pgThresh);
+        minClust,pruneThr,modular,pgThresh,javaPathVar,classPathVar,toolkitPath);
     
     % Recover from random permutation
     iL = 1;
