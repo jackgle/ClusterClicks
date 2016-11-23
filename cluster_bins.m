@@ -28,17 +28,17 @@ classPathVar = ' E:\workspace\ClusterGephi_sio\bin';
 toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolkit.jar';
 
 %%% set inputs and setting values
-siteName = 'GofMX_DC'; % First few letters of TPWS file names
+siteName = 'JAX11D'; % First few letters of TPWS file names
 
 % directory where those TPWS files live
-inDir = 'F:\GOM_clickTypePaper_detections\TPWS\DC02_03_TPWS';
-outDir = 'F:\GOM_clickTypePaper_detections\TPWS\DC02_03_TPWS\Cluster2016';
+inDir = 'H:\JAX11D_TPWS';
+outDir = 'H:\JAX11D_TPWS\Cluster2016';
 
 %%% Clustering parameter choices
 p.minClust = 100; % minimum number of clicks required for a cluster to be retained.
 % Think about how fast your species click, group sizes, and how many clicks they make
 % per N minutes...
-p.pruneThr = 90; % Percentage of edges between nodes that you want to prune.
+p.pruneThr = 95; % Percentage of edges between nodes that you want to prune.
 % Pruning speeds up clustering, but can result in isolation (therefore
 % loss) of rare click types.
 p.pgThresh = 0; % Percentile of nodes to remove from metwork using PageRank weights.
@@ -52,6 +52,8 @@ p.modular = 0; % if you use a number other than 0, modularity algorithm will be 
 
 p.plotFlag = 0; % Want plots? Turn this off for large jobs, but useful for
 % seeing how your clusters are coming out when choosing parameters above.
+p.falseRM = 1; % Want to remove false positives? Working on removing the 
+% need for manual false positive ID step.
 
 %%% Frequencies you want to compare clicks across:
 % comparing across the full bandwidth tends to reduce differences between click
@@ -68,7 +70,7 @@ p.diff = 0;% compare first derivative of spectra if 1. If 0 spectra will be comp
 
 % Option to enforce a minimum recieved level (dB peak to peak), and only
 % cluster high-amplitude clicks, which tend to have cleaner spectra.
-p.ppThresh = 110;
+p.ppThresh = 120;
 
 %%% Time bins: clicks are clustered by time bin. How long of a bin do you
 % want to consider?
@@ -76,7 +78,7 @@ p.ppThresh = 110;
 % But large time bins mean more click counts -> longer computation times,
 % or subsampling
 p.timeStep = 5; % bin duration in mins
-p.maxNetworkSz = 4000; % maximum # of clicks allowed in a network.
+p.maxNetworkSz = 5000; % maximum # of clicks allowed in a network.
 % If there are more clicks in a time bin than this number, a random subset
 % will be selected for clustering. Your computer will need to handle
 % maxNetworkSz^2 edges, so more RAM -> larger networks.
@@ -105,13 +107,18 @@ fdAll = [];
 
 % Load all FD files, in case for some reason they don't line up with TPWS
 % files. This may be unnecessary now, and it's slower (input to setdiff)
-for i0 = 1:length(fdNames)
-    zFD = [];
-    load(fdNames(i0).name,'zFD');
-    fdAll = [fdAll;zFD];
+falseStr = '_FPincl';
+if p.falseRM
+    for i0 = 1:length(fdNames)
+        zFD = [];
+        load(fdNames(i0).name,'zFD');
+        fdAll = [fdAll;zFD];
+    end
+    falseStr = '_FPremov';
 end
+
 fkeep = [];
-for itr = 17:length(ttppNames)
+for itr = 1:length(ttppNames)
     thisFile = ttppNames(itr).name;
     MTT = [];
     MPP = [];
@@ -130,11 +137,11 @@ for itr = 17:length(ttppNames)
     % load(FDname,'zFD')
     % make output file name that incorporates settings:
     if p.diff
-        outName = strrep(thisFile,'TPWS1',sprintf('clusters_diff_PG%d_PR%d_MIN%d_MOD%d_PPmin%d',...
-            p.pgThresh, p.pruneThr, p.minClust, p.modular,p.ppThresh));
+        outName = strrep(thisFile,'TPWS1',sprintf('clusters_diff_PG%d_PR%d_MIN%d_MOD%d_PPmin%d%s',...
+            p.pgThresh, p.pruneThr, p.minClust, p.modular,p.ppThresh,falseStr));
     else
-        outName = strrep(thisFile,'TPWS1',sprintf('clusters_PG%d_PR%d_MIN%d_MOD%d',...
-            p.pgThresh, p.pruneThr, p.minClust, p.modular));
+        outName = strrep(thisFile,'TPWS1',sprintf('clusters_PG%d_PR%d_MIN%d_MOD%d%s',...
+            p.pgThresh, p.pruneThr, p.minClust, p.modular,falseStr));
     end
     % remove false positive clicks
     [~, keepIdx] = setdiff(MTT,fdAll);

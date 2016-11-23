@@ -1,26 +1,17 @@
-function [distClickE,rows1,cols1,specClickTf_norm,specClickTf_norm_short] = ...
-    spectra_dist(specClickTf,stIdx,edIdx)
+function [distClickE,rows1,cols1] = spectra_dist(specClickTf)
 
 % TODO: make weighted correlation an option to be fed in
 wcorTF = 0;
 
-minSSsection = min(specClickTf,[],2);
-specClickTf_minNorm = (specClickTf - ...
-  minSSsection(:,ones(1,size(specClickTf,2))));
-maxSSsection = max(specClickTf_minNorm,[],2);
-specClickTf_norm = specClickTf_minNorm./maxSSsection(:,ones(1,size(specClickTf_minNorm,2)));
-specClickTf_norm_short = specClickTf_norm(:,stIdx:edIdx);
-specClickTf_norm_short = diff(specClickTf_norm_short,1,2);
-
-tempN = size(specClickTf_norm_short,1);
+tempN = size(specClickTf,1);
 offaxN = ((tempN.^2)-tempN)./2;
 
 rows1 = zeros(offaxN, 1);
 cols1 = zeros(offaxN, 1);
 n = 1;
 
-for itrA = 1:size(specClickTf_norm_short,1)-1  
-    for itrB = itrA+1:size(specClickTf_norm_short,1)
+for itrA = 1:size(specClickTf,1)-1  
+    for itrB = itrA+1:size(specClickTf,1)
         rows1(n) = itrA;
         cols1(n) = itrB;
         n = n+1;
@@ -28,7 +19,7 @@ for itrA = 1:size(specClickTf_norm_short,1)-1
 end
 if ~wcorTF
     % distClick = pdist(specClickTf_norm,'seuclidean');
-    distClick = pdist(specClickTf_norm_short,'correlation');
+    distClick = pdist(specClickTf,'correlation');
     distClickE = (exp(-distClick));
 else
     % weighted correlation
