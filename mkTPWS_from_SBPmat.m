@@ -93,5 +93,9 @@ for itr0 = 1:length(dirSet)
         outFileName = sprintf('%s_%s_TPWS1.mat',siteName,dirSet(itr0).name);
         save(fullfile(outDir,outFileName),'MTT','MPP','MSP','MSN','f',...
             '-v7.3')
+        MTT = [];
+        MPP = [];
+        MSP = [];
+        MSN = [];
     end
 end

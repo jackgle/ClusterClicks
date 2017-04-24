@@ -1,12 +1,13 @@
-function [spectraMean,clickAssign,clustSizes,spectraHolder,...
-    clickAssignAll] = cluster_clicks(specClickTf,p,javaPathVar,...
+function [spectraMean,clickAssign,clustSizes,spectraHolder,isolatedAll] = ...
+    cluster_clicks(specClickTf,p,javaPathVar,...
     classPathVar,toolkitPath)
 
 clickAssign = [];
 spectraHolder = [];
+isolatedAll = [];
 clustSizes = 0;
 filename = 'io_test4.csv';
-wcorTF = 0; % flag for weighted corrlation. 
+wcorTF = 0; % flag for weighted correlation. 
 % Weighted option lets you give more weight to similarities at some
 % frequencies than others.  
 
@@ -60,6 +61,7 @@ if wcorTF ~= 1
 
     distClick = pdist(specClickTf_norm_short,'correlation');
     distClickE = (exp(-distClick));
+    
 else
     % weighted correlation
     % Wgts = 1:-1/(size(specClickTf,2)-1):0; % Vector from 1 to 0 ->
@@ -126,10 +128,8 @@ end
 clusters = dataTable(3,:)';
 clustersAll = dataTable(1,:)';
 nodeNums = char(labels(1,:)');
-nodeNumsAll = char(labels(1,:)');
 % rankVals = dataTable(3,pgRank);
 nodeNums = str2double(cellstr(nodeNums(:,2:end)));
-nodeNumsAll =  str2double(cellstr(nodeNumsAll(:,2:end)));
 clustBins = 0:max(clusters);
 counts = histc(clusters,clustBins);
 keepClust = find(counts >= p.minClust);
@@ -147,12 +147,12 @@ if ~isempty(keepClust)
         linearSpec = 10.^(specClickTf_norm(nodeNums(clusters==clustNums(i4)),:)./20);
         spectraMean(i4,:) = 20*log10(mean(linearSpec));
         % spectraStd(i4,:) = std(specClickTf_norm(nodeNums(clusters==clustNums(i4)),:));
-        clickAssignAll{i4} = nodeNumsAll(clustersAll == clustNums(i4));
         clickAssign{i4} = nodeNums(clusters==clustNums(i4));
         spectraHolder{i4} = specClickTf_norm(nodeNums(clusters==clustNums(i4)),:);
     end
 end
 % 
+isolatedAll = setdiff(1:size(specClickTf,1),vertcat(clickAssign{:}));
 % if length(nodenums)>minClust
 %     spectraMean = mean(specClickTf_norm(nodenums,:));
 % 	spectraStd = std(specClickTf_norm(nodenums,:));

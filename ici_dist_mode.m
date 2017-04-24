@@ -1,8 +1,8 @@
-function [distClickE,rows1,cols1,iciMode] = ici_dist_mode(iciMat,barInt,minBinIdx)
+function [distClickE,rows1,cols1,iciMode] = ici_dist_mode(iciMode,maxDiff)
 % iciNorm = iciMat./repmat(sum(iciMat,2),1,size(iciMat,2));
 
-[~,iciModeIdx] = max(iciMat(:,minBinIdx:end),[],2);
-iciMode = barInt(iciModeIdx+minBinIdx-1) + barInt(2)./2;
+%[~,iciModeIdx] = max(iciMat,[],2);
+%iciMode = barInt(iciModeIdx) + ((barInt(2)-barInt(1))/2);
 
 tempN = size(iciMode,1);
 offaxN = ((tempN.^2)-tempN)./2;
@@ -20,5 +20,5 @@ for itrA = 1:size(iciMode,1)-1
 end
 distClick = pdist(iciMode','euclidean');
 
-distClickE = exp(-distClick);
+distClickE = exp(-distClick./maxDiff);
 

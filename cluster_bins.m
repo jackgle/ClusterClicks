@@ -28,17 +28,21 @@ classPathVar = ' E:\workspace\ClusterGephi_sio\bin';
 toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolkit.jar';
 
 %%% set inputs and setting values
-siteName = 'JAX11D'; % First few letters of TPWS file names
+siteName = 'HAT'; % First few letters of TPWS file names
 
 % directory where those TPWS files live
-inDir = 'H:\JAX11D_TPWS';
-outDir = 'H:\JAX11D_TPWS\Cluster2016';
+inDir = 'I:\HAT\TPWS';
+outDir = 'I:\HAT\ClusterBins';
+
+%pruneItrVals = fliplr([70,80,90,95,97,99]);
+%for iPrune = length(pruneItrVals)
 
 %%% Clustering parameter choices
 p.minClust = 100; % minimum number of clicks required for a cluster to be retained.
 % Think about how fast your species click, group sizes, and how many clicks they make
 % per N minutes...
-p.pruneThr = 95; % Percentage of edges between nodes that you want to prune.
+%p.pruneThr = pruneItrVals(iPrune);
+p.pruneThr = 97; % Percentage of edges between nodes that you want to prune.
 % Pruning speeds up clustering, but can result in isolation (therefore
 % loss) of rare click types.
 p.pgThresh = 0; % Percentile of nodes to remove from metwork using PageRank weights.
@@ -60,13 +64,13 @@ p.falseRM = 1; % Want to remove false positives? Working on removing the
 % types. Results are typically better if you focus comparing the region
 % where frequencies differ most.
 p.stIdx = 1; % index of start freq in vector "f" from TPWS
-p.edIdx = 81; % index of end freq
+p.edIdx = 121; % index of end freq
 
 %%% Vectors to use for binning ICI and click rate
 p.barInt = 0:.01:.5; % ICI bins in seconds (minICI:resolution:maxICI)
 p.barRate = 1:1:30; % click rate in clicks per second (minRate:resolution:maxRate)
 
-p.diff = 0;% compare first derivative of spectra if 1. If 0 spectra will be compared normally.
+p.diff = 1;% compare first derivative of spectra if 1. If 0 spectra will be compared normally.
 
 % Option to enforce a minimum recieved level (dB peak to peak), and only
 % cluster high-amplitude clicks, which tend to have cleaner spectra.
@@ -99,7 +103,8 @@ cInt = [];
 tInt = [];
 dTT = {};
 cIdx = 1;
-
+nIsolated = {};
+clusteredTF = [];
 ttppNames = dir([siteName,'*_TPWS1.mat']);
 
 fdNames = dir([siteName,'*_FD1.mat']);
@@ -108,6 +113,7 @@ fdAll = [];
 % Load all FD files, in case for some reason they don't line up with TPWS
 % files. This may be unnecessary now, and it's slower (input to setdiff)
 falseStr = '_FPincl';
+
 if p.falseRM
     for i0 = 1:length(fdNames)
         zFD = [];
@@ -117,7 +123,8 @@ if p.falseRM
     falseStr = '_FPremov';
 end
 
-fkeep = [];
+fkeep = [];            
+noCluster = 0;
 for itr = 1:length(ttppNames)
     thisFile = ttppNames(itr).name;
     MTT = [];
@@ -169,12 +176,13 @@ for itr = 1:length(ttppNames)
     % loop over bins
     for iC = 1:1:length(dateInterval)-1
         nClicks = testN(iC); % store number of clicks in interval
-
+        idSet = idxer(testBin == iC);
+        specSet = MSP(idSet,:);
+        ppSet = MPP(idSet);
+        ttSet = MTT(idSet);
+        
         if nClicks >= p.minClust*(1+(p.pgThresh/100))
-            idSet = idxer(testBin == iC);
-            specSet = MSP(idSet,:);
-            ppSet = MPP(idSet);
-            ttSet = MTT(idSet);
+
                         
             % if the interval contains more than 4000 good clicks, randomly
             % select a subset for clustering
@@ -187,9 +195,8 @@ for itr = 1:length(ttppNames)
             end
             
             % Cluster
-            [spectraMean,clickAssign,~,specHolder] = cluster_clicks(specSet,...
+            [spectraMean,clickAssign,~,specHolder,isolated] = cluster_clicks(specSet,...
                 p,javaPathVar,classPathVar,toolkitPath);
-            
             
             % If you finish clustering with populated cluster(s)
             if ~isempty(clickAssign)
@@ -200,15 +207,22 @@ for itr = 1:length(ttppNames)
                 sizeCA = zeros(size(clickAssign));
                 dtt = zeros(size(clickAssign,2),length(p.barInt));
                 cRate = zeros(size(clickAssign,2),length(p.barRate));
+                isolatedSet = zeros(size(clickAssign));
+                meanSim = zeros(size(clickAssign));
                 for iS = 1:size(clickAssign,2)
                     sizeCA(1,iS) = size(clickAssign{iS},1);
                     dtt(iS,:) = histc(diff(sort(ttSet(clickAssign{iS})))...
-                        *24*60*60,p.barInt);
+                        *24*60*60,p.barInt)';
                     cRate(iS,:) = histc(1./(diff(sort(ttSet(clickAssign{iS})))...
-                        *24*60*60),p.barRate);
+                        *24*60*60),p.barRate)';
+                    isolatedSet(1,iS) = length(isolated);
+                    % temporay calculation of within cluster similarity.
+                    % disable soon!
+%                     distClickTemp = pdist(specHolder{iS},'correlation');
+%                     meanSim(1,iS) = mean(exp(-distClickTemp));
                 end
                 
-                
+                nIsolated{cIdx,1} = isolatedSet;
                 sumSpec{cIdx,1} = spectraMean; % store summary spectra
                 nSpec{cIdx,1} = sizeCA; % store # of clicks associated with each summary spec
                 percSpec{cIdx,1} = sizeCA./size(specSet,1); % store % of clicks associated with each summary spec
@@ -216,7 +230,9 @@ for itr = 1:length(ttppNames)
                 tInt(cIdx,:) = [dateInterval(iC),dateInterval(iC+1)]; % store start and end time of interval
                 dTT{cIdx,1} = dtt;
                 clickRate{cIdx,1} = cRate;
+                clusteredTF(cIdx,:) = 1;
                 cIdx = cIdx +1;
+                %meanSimilarity{cIdx,:} = meanSim; % disable soon!
                 %%
                 if p.plotFlag
                     % plot mean spectra
@@ -270,7 +286,24 @@ for itr = 1:length(ttppNames)
                     % pause
                     1;
                 end
+            else
+                noCluster = 1;
             end
+        elseif nClicks>0
+            noCluster = 1;
+        end
+        if noCluster
+            nIsolated{cIdx,1} = NaN;
+            sumSpec{cIdx,1} = calc_norm_spec_mean(specSet); % store summary spectra
+            nSpec{cIdx,1} = nClicks; % store # of clicks associated with each summary spec
+            percSpec{cIdx,1} = 1; % store % of clicks associated with each summary spec
+            cInt(cIdx,1) = nClicks; % store number of clicks in interval
+            tInt(cIdx,:) = [dateInterval(iC),dateInterval(iC+1)]; % store start and end time of interval
+            dTT{cIdx,1} = histc(diff(sort(ttSet))*24*60*60,p.barInt)';
+            clickRate{cIdx,1} = histc(1./(diff(sort(ttSet))*24*60*60),p.barRate)';
+            clusteredTF(cIdx,:) = 0;
+            cIdx = cIdx +1;
+            noCluster = 0;
         end
         if mod(iC,200) == 0
             fprintf('done with bin # %d of %d, file %d\n',iC-1,length(dateInterval),itr)
@@ -279,6 +312,8 @@ for itr = 1:length(ttppNames)
     
     % save output
     save(fullfile(outDir,outName),'dTT','sumSpec','percSpec',...
-        'cInt','tInt','p','f','nSpec', 'clickRate')
+        'cInt','tInt','p','f','nSpec', 'clickRate','nIsolated','clusteredTF')
     
 end
+
+%end

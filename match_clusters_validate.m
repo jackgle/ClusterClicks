@@ -1,14 +1,14 @@
 clearvars
-siteStr = 'HZ';
-savDir = 'E:\Data\John Reports\WAT\dolphins\HZ_matched';
-fileToMatch = 'H:\WAT_HZmetadata\TPWS\ClusterBins\WAT_HZ_01_ALLDISKS_Delphin_clusters_diff_PG0_PR97_MIN100_MOD0_PPmin120_FPremov.mat';
-typeFile = 'E:\Data\John Reports\WAT\dolphins\HZ_subset_5000each_min200_typesHR.mat';
+siteStr = 'MP3';
+savDir = 'E:\Data\Papers\ClickClass2015\revamp';
+fileToMatch = 'G:\MP\MP04_TPWS\cluster_bins_output\GofMX_MP04_disk09_Delphin_clusters_diff_PG0_PR97_MIN100_MOD0_PPmin120_FPremov.mat';
+typeFile = 'F:\GOM_clickTypePaper_detections\TPWS\MC_GC_DTmerge\iciFix\MC_GC_DT_MP_DC_autoCluster_95_1000ofEach_1-121_diff_min200_icifix_typesHR.mat';
 % siteStr = 'HAT_05_A';
 % savDir = 'E:\Data\John Reports\HAT05A\dolphins';
 % fileToMatch = 'G:\MC\Matched\MC01-11_clusters_ALL_cell.mat';
 % typeFile = 'E:\Data\John Reports\HAT05A\dolphins\HAT_A_05_subsetof8000_matrix_typesHR.mat';
 
-manualVerify = 0; % set to 1 if you want to manually assign an ID to bins with no good matches.
+manualValidate = 1; % set to 1 if you want to manually assign an ID to bins with no good matches.
 % else make it 0
 
 load(fileToMatch);
@@ -18,11 +18,14 @@ Tfinal = Tfinal(:,:);
 % Prune Tfinal if needed
 p.edIdx = 121;
 nTemplates = size(Tfinal,1);
-cMax = 0.3;
+cMax = 0.25;
 visualize = 0;
 minICI = 1;
-maxICI = 31;
+maxICI = 41;
 % Check for output directory
+
+% check 100 entries
+myInt = 56; %unique(round(1:size(tInt,1)/200:size(tInt,1)));
 if ~exist(savDir,'dir')
     mkdir(savDir)
 end
@@ -32,7 +35,7 @@ autoID = cell(size(tInt,1),nTemplates);
 labeledCountsAll = zeros(size(tInt,1),nTemplates+1);
 pSpecAll = cell(size(tInt,1),1);
 cAll = zeros(size(tInt,1),1);
-
+manVAuto = [];
 %%
 specCentroids = [];
 iciCentroids = [];%nan(size(Tfinal,1),1);
@@ -50,7 +53,7 @@ for iTF = 1:size(Tfinal,1)
 end
 
 minBinIdx = 1;
-if manualVerify
+if manualValidate
     figure(222);clf;
     subplot(1,2,1)
     plot(f(p.stIdx:p.edIdx),specCentroids)
@@ -58,9 +61,8 @@ if manualVerify
     xlim([10,65])
     subplot(1,2,2)
     plot(p.barInt(1:maxICI),iciCentroids)
-    
-    
 end
+
 for i0 = 1:length(sumSpec)
     % normalize mean spectra for this bin and compute diff
     if cInt(i0)>1
@@ -172,7 +174,7 @@ for i0 = 1:length(sumSpec)
                 
                 
                 
-                if visualize || manualVerify
+                if visualize || manualValidate
                     if  C >= cMax
                         cStr = 'b';
                     else
@@ -200,7 +202,8 @@ for i0 = 1:length(sumSpec)
                         plot(p.barInt(1:maxICI),matchedICI(I,:),'k','linewidth',2)
                     end
                     title(gca,sprintf('Type %d, Overall Score %0.2f; Bin %d of %d',I,C,i0,length(sumSpec)))
-                    xlim([0,p.barInt(maxICI)])
+                    xlim([0,max(p.barInt)])
+                    xlim([0,.4])
                     if C < cMax
                         1;
                     else
@@ -209,8 +212,8 @@ for i0 = 1:length(sumSpec)
                     1;
                 end
                 
-                if C < cMax
-                    if manualVerify && C>=.05
+                if ~isempty(intersect(myInt,i0)) %&& iS == 1
+                    if manualValidate && C>=.05
                         if C > .25
                             tempAnswer = I;
                         else
@@ -225,24 +228,29 @@ for i0 = 1:length(sumSpec)
                                 manualAnswer = NaN; 
                             end
                         end
-                        I = manualAnswer;
+                        Iman = manualAnswer;
                     else
-                        I = nTemplates+1; % if no good matches, assign a max IDx
+                        Iman = nTemplates+1; % if no good matches, assign a max IDx
                         % pause(2);
                         
                     end
                 else
-                    % pause(2);
+                    Iman = NaN;% pause(2);
                 end
                 autoID{i0} = [autoID{i0},I];
+                manVAuto = [manVAuto;[I, Iman, C]];
                 autoScore{i0} = [autoScore{i0},C];
                 labeledCountsAll(i0,I) = labeledCountsAll(i0,I)+...
                     round((percSpec{i0}(iS)./sum(percSpec{i0}))*cInt(i0));
             else
                 autoID{i0} = [autoID{i0},nTemplates+1];
+                manVAuto = [manVAuto;[I, Iman, C]];
                 autoScore{i0} = [autoScore{i0},NaN];
                 labeledCountsAll(i0,nTemplates+1) = labeledCountsAll(i0,nTemplates+1)+...
                     round((percSpec{i0}(iS)./sum(percSpec{i0}))*cInt(i0));
+            end
+            if length(manVAuto)==65
+                1;
             end
         end
         pSpecAll(i0,1) = percSpec(i0);
@@ -299,8 +307,18 @@ for iP = 1:nTypes
     ylim([0,ylimHi(2)])
 end
 %%
+
+manVAutoPrune = manVAuto(~isnan(manVAuto(:,2)),:);
+manVAutoPrune = manVAutoPrune(manVAutoPrune(:,1)<nTemplates+1,:);
+[C,I] = histc(manVAutoPrune(:,3),0:.1:1);
+rightClass_perc = nan(10,1);
+lenSet = [];
+for iR = 1:length(C)
+    autoSet = manVAutoPrune((I==iR),1);
+    manSet = manVAutoPrune((I==iR),2);
+    rightClass_perc(iR) = sum(all(autoSet==manSet,2))./length(autoSet);
+    lenSet(iR) = length(autoSet);
+end
 save(fullfile(savDir,sprintf('%s_autoMatch',siteStr)),'siteStr',...
     'labeledCountsAll','pSpecAll','autoScore','nTemplates','Tfinal','typeFile',...
-    'tInt','tsWeekBins','autoID','cAll','manualVerify')
-
-
+    'tInt','tsWeekBins','autoID','cAll','manualValidate','manVAuto','lenSet','rightClass_perc')

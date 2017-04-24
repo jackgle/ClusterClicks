@@ -1,4 +1,4 @@
-function [NMIList] = compute_NMI(nList,ka,naiItr,inputSet)
+function [NMIList] = compute_AMI(nList,ka,naiItr,commonSet)
 % inputs:
 % nList = cell array containing the list of nodes in each partition
 % ka = vector containing number of clusters in each partition
@@ -9,14 +9,13 @@ function [NMIList] = compute_NMI(nList,ka,naiItr,inputSet)
 N = length(nList); % # of partitions
 cntr2=1;
 NMIList = zeros(N,N);
-for i = 1:N 
+for i = 1:N % iterate over partitions
     kA = ka(i); % # of clusters in iteration A
     
-    for j = i+1:N
+    for j = i+1:N %for each partition
         kB = ka(j); 
         % find nodes common to both datasets
         % commonSet = intersect(nList{i},nList{j});
-        commonSet = intersect(inputSet{1},inputSet{j});
         n = length(commonSet);
         
         % Compute entropy of A for each cluster

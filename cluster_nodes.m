@@ -11,8 +11,8 @@ cols1 = zeros(offaxN, 1);
 distMatL = zeros(offaxN, 1);
 n = 1;
 
-for itrA = 1:size(distMat,1)-1
-    for itrB = itrA+1:size(distMat,1)
+for itrA = 1:tempN-1
+    for itrB = itrA+1:tempN
         rows1(n) = itrA;
         cols1(n) = itrB;
         distMatL(n) = distMat(itrA,itrB);
@@ -26,8 +26,8 @@ else
     thrP = prctile(distMatL,thr);
 end
 tempN = ceil(sqrt(length(distMatL)*2));
-
-[values, rows, cols, isolated] = prune(tempN, distMatL, rows1, cols1, thrP);
+[values, rows, cols, isolated] = prune_by_node1(tempN, distMatL, rows1, cols1, thrP);
+% [values, rows, cols, isolated] = prune(tempN, distMatL, rows1, cols1, thrP);
 nodesRemaining = length(values);
 if nodesRemaining < minClust
     fprintf('Too few nodes remaining after pruning, skipping iteration \n')
@@ -46,7 +46,7 @@ fprintf(fid, '}\n');
 fclose(fid);
 
 [status,result] = system(sprintf('"%s" -Xms512m -Xmx6144m -Dfile.encoding=Cp1252 -classpath %s;%s ClusterGephi.ClusterMain "%s" "%g" "%g"',...
-    javaPathVar,classPathVar,toolkitPath,file2Write,modularity,pgRnkPrctile));
+    javaPathVar,classPathVar,toolkitPath,file2Write,modularity,pgRnkPrctile/100));
 if status~=0
     error(result)
 % else
