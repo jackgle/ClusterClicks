@@ -1,32 +1,41 @@
+% match_clusters.m
+
+% Takes output from cluster_bins.m and assigns click type labels to it
+% using the output fom composite_clusters.m 
+
 clearvars
 siteStr = 'HZ';
-savDir = 'E:\Data\John Reports\WAT\dolphins\HZ_matched';
-fileToMatch = 'H:\WAT_HZmetadata\TPWS\ClusterBins\WAT_HZ_01_ALLDISKS_Delphin_clusters_diff_PG0_PR97_MIN100_MOD0_PPmin120_FPremov.mat';
-typeFile = 'E:\Data\John Reports\WAT\dolphins\HZ_subset_5000each_min200_typesHR.mat';
-% siteStr = 'HAT_05_A';
-% savDir = 'E:\Data\John Reports\HAT05A\dolphins';
-% fileToMatch = 'G:\MC\Matched\MC01-11_clusters_ALL_cell.mat';
-% typeFile = 'E:\Data\John Reports\HAT05A\dolphins\HAT_A_05_subsetof8000_matrix_typesHR.mat';
+savDir = 'H:\HAT02-03A\ClusterBins\Temp';
+fileToMatch = 'H:\HAT02-03A\ClusterBins\HAT02and3A_cluster_bins.mat';
+typeFile = 'H:\HAT02-03A\ClusterBins\Temp\HAT02-03_auto_95_typesHR.mat';
 
 manualVerify = 0; % set to 1 if you want to manually assign an ID to bins with no good matches.
 % else make it 0
 
+% load data and templates
 load(fileToMatch);
-load(typeFile,'Tfinal','iLine');
-Tfinal = Tfinal(:,:);
+load(typeFile,'Tfinal');
+% Note: If you don't want to match all the templates in Tfinal, prune it
+% here, for example
+% Tfinal = Tfinal([1,3,5],:);% only match templates 1, 3 and 5
 
-% Prune Tfinal if needed
+
+% Some settings about what part of the spectra to compare.
 p.edIdx = 121;
 nTemplates = size(Tfinal,1);
 cMax = 0.3;
-visualize = 0;
+visualize = 1;
 minICI = 1;
 maxICI = 31;
-% Check for output directory
+minNumClicks = 100; % don't try to classify bins with fewer than this number of clicks
+
+
+% Check for output directory and make it if it doesn't exist
 if ~exist(savDir,'dir')
     mkdir(savDir)
 end
 
+% Initialize variables
 autoScore = cell(size(tInt,1),1);
 autoID = cell(size(tInt,1),nTemplates);
 labeledCountsAll = zeros(size(tInt,1),nTemplates+1);
@@ -40,8 +49,8 @@ nTf = ones(size(Tfinal,1),1);
 normTfinalSpec = [];
 
 for iTF = 1:size(Tfinal,1)
-    iciCentroids(iTF,:) = mean(Tfinal{iTF,2});
-    specCentroid1 = mean(Tfinal{iTF,1}(:,p.stIdx:p.edIdx));
+    iciCentroids(iTF,:) = nanmean(Tfinal{iTF,2});
+    specCentroid1 = nanmean(Tfinal{iTF,1}(:,p.stIdx:p.edIdx));
     specCentroids(iTF,:) = (specCentroid1-min(specCentroid1))./max(specCentroid1-min(specCentroid1));
     nTf(iTF) = size(Tfinal{iTF},1);
     normTfinalSpec1 = Tfinal{iTF,1}(:,p.stIdx:p.edIdx);
@@ -49,7 +58,9 @@ for iTF = 1:size(Tfinal,1)
     normTfinalSpec{iTF,1} = normTfinalSpec1./repmat(max(normTfinalSpec1,[],2),1,length(p.stIdx:p.edIdx));
 end
 
-minBinIdx = 1;
+
+% if you are going to manually check, make a plot of all the click types to
+% compare to.
 if manualVerify
     figure(222);clf;
     subplot(1,2,1)
@@ -58,12 +69,12 @@ if manualVerify
     xlim([10,65])
     subplot(1,2,2)
     plot(p.barInt(1:maxICI),iciCentroids)
-    
-    
 end
+
+minBinIdx = 1;
 for i0 = 1:length(sumSpec)
-    % normalize mean spectra for this bin and compute diff
-    if cInt(i0)>1
+    if cInt(i0)>1    
+        % normalize mean spectra for this bin 
         minSSsection = min(sumSpec{i0},[],2);
         specClickTf_minNorm = (sumSpec{i0} - ...
             minSSsection(:,ones(1,size(sumSpec{i0},2))));
@@ -77,6 +88,7 @@ for i0 = 1:length(sumSpec)
             dTT{i0} = dTT{i0}';
         end
         dTTmat = vertcat(dTT{i0});
+        
         % normalize ICI distributions
         dTTmatNorm1 = dTTmat./repmat(sum(dTTmat,2),1,size(dTTmat,2));
         dTTmatNorm = dTTmatNorm1./repmat(max(dTTmatNorm1,[],2),1,size(dTTmat,2));
@@ -84,8 +96,10 @@ for i0 = 1:length(sumSpec)
         [~,iciModeIdx] = max(dTTmatNorm(:,minBinIdx:end),[],2);
         saturatedSet = find(iciModeIdx <= 3);
         
+        % this statement handles saturated ICI distributions, where large
+        % numbers of overlapping click trains produce a peak at low ICI.
         for iSat = 1:length(saturatedSet)
-            if ~isnan(mean(dTTmatNorm(saturatedSet(iSat),1:end)));
+            if ~isnan(mean(dTTmatNorm(saturatedSet(iSat),1:end)))
                 thisDTTsmoothDiff = diff(dTTmatNorm(saturatedSet(iSat),1:end));
                 minIdx = find(thisDTTsmoothDiff(2:end)>0.02, 1,'first')+1;
                 if isempty(minIdx)
@@ -99,7 +113,7 @@ for i0 = 1:length(sumSpec)
         
         % iterate over spectra in bin
         for iS = 1:size(specClickTf_norm_short,1)
-            if nSpec{i0}(iS)>100
+            if nSpec{i0}(iS)>minNumClicks  % doesn't classify bins with fewer than X clicks
                 %         iciDist = exp(-pdist2(iciMode(iS),iciCentroids,'euclidean'));
                 %         specCorr = exp(-pdist2(specClickTf_norm_short(iS,:),...
                 %                 specCentroids,'correlation'));
@@ -117,23 +131,35 @@ for i0 = 1:length(sumSpec)
                 specCorr = {};
                 iciModeDist = {};
                 for iTF = 1:size(Tfinal,1)
-                    % compute spectral similarities
+                    % Compute spectral and ICI similarities for each
+                    % possible template.
+                    
+                    % There have been many variations of this, as evidenced
+                    % by the commented code. Left in to provide alternate
+                    % options.
                     
                     specCorr{iTF} = exp(-pdist2(diff(thisSpec),...
                         diff(normTfinalSpec{iTF,1},1,2),'correlation'));
                     % compute modal ici similarities
-                    %             iciModeDist{iTF}  = (exp(-pdist2(dTTmatNorm(iS,minICI:maxICI),...
-                    %                 Tfinal{iTF,2}(:,minICI:maxICI),'correlation')));
+                    % iciModeDist{iTF}  = (exp(-pdist2(dTTmatNorm(iS,minICI:maxICI),...
+                    % iTfinal{iTF,2}(:,minICI:maxICI),'correlation')));
                     iciModeDist{iTF} = exp(-pdist2(iciMode(iS),Tfinal{iTF,4}','euclidean')./p.barInt(maxICI));
                     % compute combined similarity scores
                     % [~,sortSpecScoreIdx] = sort(iciModeDist,'descend');
                     [comboDistSortSet{iTF},comboDistSortSetIdx{iTF}] = sort(specCorr{iTF}.*iciModeDist{iTF},'descend');
                     
-                    %bestN = round(.5*length(comboDistSortSetIdx{iTF}));
-                    %sumOfSq(iTF,1) = sum(comboDistSortSet{iTF}(1:bestN).^2)./bestN;%./length(comboDistSortSet{iTF});
+                    % bestN = round(.5*length(comboDistSortSetIdx{iTF}));
+                    % sumOfSq(iTF,1) = sum(comboDistSortSet{iTF}(1:bestN).^2)./bestN;%./length(comboDistSortSet{iTF});
                     % comboDistSortSet{iTF} = specCorr;
                     % comboDistHist(iTF,:) = histc(comboDistSortSet{iTF},0:.1:1);
                 end
+                
+                % Prune out poor matches and pick the best overall matching
+                % template. This step is finicky. I would like to see it
+                % replaced with a neural net that would be trained on the
+                % composite clusters output and then handed novel examples
+                % from the full dataset.
+                
                 pCut = prctile(cell2mat(comboDistSortSet),90);
                 matchedSpec = [];
                 nAboveCutoff = [];
@@ -171,9 +197,12 @@ for i0 = 1:length(sumSpec)
                 matchedICI  = iciCentroids;
                 
                 
-                
+                % Show the match, and if it's a bad match and the user
+                % wants to manually verify, let them do so.
                 if visualize || manualVerify
                     if  C >= cMax
+                        % If the match is better than the threshold
+                        % similariity cuttof, color blue, otherwise red
                         cStr = 'b';
                     else
                         cStr = 'r';
@@ -185,7 +214,6 @@ for i0 = 1:length(sumSpec)
                     if C >= cMax
                         plot(f(p.stIdx:p.edIdx),matchedSpec(I,:),'k')
                         %title(sprintf('%d good matches',nAboveCutoff(I)));
-                        
                     end
                     title(sprintf('best spec:%d, %0.2f \n best ici:%d, %0.2f',bestSpecIdx,...
                         bestSpec,bestICIIdx,bestICI))
@@ -201,19 +229,25 @@ for i0 = 1:length(sumSpec)
                     end
                     title(gca,sprintf('Type %d, Overall Score %0.2f; Bin %d of %d',I,C,i0,length(sumSpec)))
                     xlim([0,p.barInt(maxICI)])
-                    if C < cMax
-                        1;
-                    else
-                        1;
-                    end
-                    1;
+                    drawnow
+                    
+%                     if C < cMax  % code for setting breakpoints during
+%                     development
+%                         1;
+%                     else
+%                         1;
+%                     end
+%                     1;
                 end
                 
-                if C < cMax
+                if C < cMax % if it's a bad match, have the user weigh in.
                     if manualVerify && C>=.05
-                        if C > .25
+                        if C > .25  
+                            % If it's somewhat certain about the match, 
+                            % it will suggest the best matching classification
                             tempAnswer = I;
                         else
+                            % Otherwise it will sugges the unknown category.
                             tempAnswer = nTemplates+1;
                         end
                         manualAnswer = NaN;
@@ -253,7 +287,7 @@ for i0 = 1:length(sumSpec)
     end
 end
 
-%%
+%% Rough plotting to check the results
 figure(191);clf
 nTypes = size(labeledCountsAll,2);
 [ha, pos] = tight_subplot(nTypes, 1,.01,.05,[.1 .03]);

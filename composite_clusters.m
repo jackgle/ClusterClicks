@@ -6,10 +6,10 @@
 
 clearvars
 
-siteName = 'JAX_auto_95';
-inDir = 'I:\Macey Rafter\JAX12D\TPWS\diff';
-inFile = 'JAX_D_12_disk07_Delphin_clusters_diff_PG0_PR95_MIN100_MOD0_PPmin120_FPremov';%'MC_GC_DT_01-02_autoCluster_90_2000ofEach.mat';
-outDir = 'I:\Macey Rafter\JAX12D\TPWS\diff';
+siteName = 'HAT02-03_auto_5_pgThres'; % used to name output files
+inDir = 'H:\HAT02-03A\ClusterBins'; 
+inFile = 'HAT02and3A_cluster_bins';%'MC_GC_DT_01-02_autoCluster_90_2000ofEach.mat';
+outDir = 'H:\HAT02-03A\ClusterBins\Temp';
 
 % Gephi and Java paths:
 javaPathVar = 'C:\Program Files\Java\jre6\bin\java.exe';
@@ -19,15 +19,16 @@ toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolk
 saveOutput = 1; %set to 1 to save output file and figs, else 0
 
 %%%% Similarity %%%%
-% choose if you want to include ICI **OR** click rate in similarity caculation
+% choose if you want to include ICI **OR** click rate in similarity calculation
 iciTF = 1; % 1 if you want to use ICI (time between clicks)
 cRateTF = 0; % 1 if you want to use click rate (# of clicks per second)
+specDiffTF = 1; % set to 1 to use spectral 1st derivatives for correlation
 
 %%%% Distribution Pruning %%%%
-stIdx = 1;
-edIdx = 121;
-maxICI = 51;
-minICI = 2;
+p.stIdx = 1;
+p.edIdx = 121;
+maxICI = 31;
+minICI = 1;
 
 %%%% Clustering %%%%
 minClust = 10; % minimum number of bins required for a cluster to be retained.
@@ -37,8 +38,18 @@ pgThresh = 0; % Percentile of nodes to remove from network using PageRank weight
 % pruned out.
 modular = 0; % If you use a number other than 0, modularity algorithm will
 % be used instead of chinese whispers. Not recommended.
-maxClust = 10000;% maximum number of bins to cluster. If you have more than
+maxClust = 5000;% maximum number of bins to cluster. If you have more than
 % this, a random subset of this size will be selected.
+subSampOnlyOnce = 1; % if your input contains more than maxClust clicks, they 
+% will be subsampled. If subSampOnlyOnce = 1, then a subsample will
+% be selected, and it will be reclustered N times. This ends up looking at
+% fewer clicks, but the best set of final clusters isn't chosen based on
+% the simplest subset. It's also faster.
+% If subSampOnlyOnce = 0, then a new subsample will be selected on each of 
+% N iterations. This looks at more signals, but risks that the final
+% clusters will be chosen from the subset that happened to have the least
+% variability.
+
 
 % Number of clusterings to use for evidence accumulation
 N = 10; % bigger is theoretically more robust, but takes longer
@@ -63,21 +74,72 @@ inFileStub = siteName;
 %% Normalize everything
 % Spectra:
 % Put click spectra into a matrix
-sumSpecMat = vertcat(sumSpec{:});
-[specNorm,diffNormSpec] = spec_norm_diff(sumSpecMat,stIdx,edIdx);
+if iscell(sumSpec)
+    sumSpecMat = vertcat(sumSpec{:});
+else
+    sumSpecMat = sumSpec;
+end
+
+[specNorm,diffNormSpec] = spec_norm_diff(sumSpecMat,p.stIdx,p.edIdx);
 
 % ICIs:
-% move ICI distributions into a matrix
-dTTmat = vertcat(dTT{:});
+% move ICI distributions into a matrix and normalize.
+if iscell(dTT)
+    for iD = 1:size(dTT,1)
+        % fixes some problems with past versions of inputs, 
+        % eventually shouldn't need this, but it's here just to check that
+        % things are oriented right for cell array to matrix conversion.
+        if isempty(dTT{iD})
+            dTT{iD} = zeros([1,length(p.barInt)]);
+        end
+        if size(dTT{iD},1)>size(dTT{iD},2)
+            dTT{iD} = dTT{iD}';
+        end
+    end
+    dTTmat = vertcat(dTT{:});
+else
+    dTTmat = dTT;
+end
 dTTmat = dTTmat(:,1:maxICI); % truncate if needed to ignore high ici peaks
 dTTmatNorm1 = dTTmat./repmat(sum(dTTmat,2),1,size(dTTmat,2));
 dTTmatNorm = dTTmatNorm1./repmat(max(dTTmatNorm1,[],2),1,size(dTTmat,2));
+
+% Handle ICI distributions that have saturation issues due to overlapping
+% clicking.
+% find dTT rows where first bin is largest
 [~,iciModeIdx] = max(dTTmatNorm(:,minICI:end),[],2);
-iciModes = p.barInt(iciModeIdx+minICI-1) + p.barInt(2)./2;
+saturatedSet = find(iciModeIdx <= 3);
+
+for iSat = 1:length(saturatedSet)
+    thisDTTsmoothDiff = diff(dTTmatNorm(saturatedSet(iSat),1:end));
+    minIdx = find(thisDTTsmoothDiff(2:end)>0, 1,'first')+1;
+    if isempty(minIdx)
+        minIdx = 1;
+    end
+    [mVal,mTemp] = max(dTTmatNorm(saturatedSet(iSat),minIdx:end),[],2);
+    iciModeIdx(saturatedSet(iSat)) = minIdx+mTemp-1;
+%     figure(1);clf;
+%     plot(iciModeIdx(saturatedSet(iSat)),mVal,'*');
+%     hold on;plot(dTTmatNorm(saturatedSet(iSat),:));plot([0,40],[0,0],'r');
+%     plot(thisDTTsmoothDiff,'g');hold off
+end
+iciModes = p.barInt(iciModeIdx+minICI) + p.barInt(2)./2;
 % [iciDist,~,~] = ici_dist(dTTmatNorm);
 
-% Click rates:
-cRateMat = vertcat(clickRate{:});
+% Click rates - convert to matrix and normalize
+if iscell(clickRate)
+    for iD = 1:size(clickRate,1)
+        if isempty(clickRate{iD})
+            clickRate{iD} = zeros([1,length(p.barRate)]);
+        end
+        if size(clickRate{iD},1)>size(clickRate{iD},2)
+            clickRate{iD} = clickRate{iD}';
+        end
+    end
+    cRateMat = vertcat(clickRate{:});
+else
+    cRateMat = clickRate;
+end
 cRateNorm1 = cRateMat./repmat(sum(cRateMat,2),1,size(cRateMat,2));
 cRateNorm = cRateNorm1./repmat(max(cRateNorm1,[],2),1,size(cRateMat,2));
 [~,cRateModeIdx] = max(cRateNorm,[],2);
@@ -86,7 +148,8 @@ cRateModes = p.barRate(cRateModeIdx) + p.barRate(2)./2;
 %% Cluster N times for evidence accumulation/robustness
 tempN = ceil(sqrt(size(cRateMat,1)*2));
 % CoMat = zeros(tempN,tempN);
-subSamp = 0; % flag goes to true if subsampling.
+subSamp = 0; % flag automatically goes to true if subsampling.
+isolatedSet = [];
 
 for iEA = 1:N
     % Select random subset if needed
@@ -94,6 +157,11 @@ for iEA = 1:N
         subSamp = 1;
         excludedIn = sort(randperm(length(dTTmatNorm),maxClust));
         fprintf('Max number of bins exceeded. Selecting random subset of %d\n',maxClust)
+        if subSampOnlyOnce
+            % set flag back to zero if you only want to subsample once,
+            % rather than taking a new subsample every time.
+            subSamp = 0;
+        end
     else
         excludedIn = 1:length(dTTmatNorm);
         subSamp = 0;
@@ -102,17 +170,19 @@ for iEA = 1:N
     if subSamp || iEA == 1
         % Only do this on first iteration, or on every iteration if you are subsampling
         % find pairwise distances between spectra
-        [specDist,~,~] = spectra_dist(diffNormSpec(excludedIn,stIdx:edIdx));
+        if specDiffTF
+            [specDist,~,~] = spectra_dist(diffNormSpec(excludedIn,p.stIdx:p.edIdx));
+        else
+            [specDist,~,~] = spectra_dist(specNorm(excludedIn,p.stIdx:p.edIdx));
+        end
         
         if iciTF % if true, use ici distributions for similarity calculations
-            [iciDist,~,~,~] = ici_dist_mode(dTTmatNorm(excludedIn,:),...
-                p.barInt,minICI);
+            [iciDist,~,~,~] = ici_dist_mode(iciModes(excludedIn),p.barInt(maxICI));
             compDist = squareform(specDist.*iciDist,'tomatrix');
             disp('Clustering on modal ICI and spectral correlations')
         elseif cRateTF
             % use click rate distributions for similarity calculations
-            [cRateDist,~,~,~] = ici_dist_mode(cRateNorm(excludedIn,:),...
-                p.barRate,1);
+            [cRateDist,~,~] = ici_dist(cRateNorm(excludedIn,:));
             compDist = squareform(specDist.*cRateDist,'tomatrix');
             disp('Clustering on modal click rate and spectral correlations')
         else
@@ -143,11 +213,13 @@ for iEA = 1:N
     nList{iEA} = excludedIn;
     ka(iEA,1) = length(nodeAssign);
     naiItr{iEA} = nodeSet;
-    
+    fprintf('found %d clusters\n',length(nodeAssign))
+    isolatedSet(iEA,1) = length(setdiff(excludedIn,horzcat(nodeSet{:})));
 end
 
 % Best of K partitions based on NMI filkov and Skiena 2004
 % Compute NMI
+fprintf('Calculating NMI\n') 
 [NMIList] = compute_NMI(nList,ka,naiItr,inputSet);
 % the one with the highest mean score is the best
 [bokVal,bokIdx] = max(sum(NMIList)./(size(NMIList,1)-1)); % account for empty diagonal.
@@ -336,7 +408,7 @@ end
 if saveOutput
     save(fullfile(outDir,[inFileStub,'_typesHR']),'Tfinal','nodeSet','NMIList',...
         'p','maxClust','minClust','maxICI','barAdj','f','siteName','nList','ka','naiItr',...
-        'iciTF','cRateTF','isolated','stIdx','edIdx','maxICI','minICI',...
+        'iciTF','cRateTF','isolated','p','maxICI','minICI',...
         'pruneThr','pgThresh','modular','N','cInt','dTT','sumSpec','tInt',...
         'percSpec','nSpec','clickRate','specNorm','dTTmatNorm','cRateNorm','inFileName')
 end

@@ -6,7 +6,7 @@
 % Script takes output from Simone/Marie's click detector and puts it into 
 % a format for use in detEdit.
 % Expects standard HARP xwav drive directory structure.
-
+% Can handle duty-cycled data.
 
 % Output:
 % A TTPP.m file containing 5 variables: 
@@ -22,10 +22,10 @@
 clearvars
 
 % Setup variables:
-baseDir = 'E:\uswtrTest'; % directory containing de_detector output
-outDir = 'E:\uswtrTest\TPWS'; % directory where you want to save your TPWS files
-siteName = 'uswtrTest'; % site name, only used to name the output file
-ppThresh = 100; % minimum RL in dBpp. If detections have RL below this
+baseDir = 'D:\USWTR01A_clickparams\mat'; % directory containing de_detector output
+outDir = 'D:\USWTR01A_clickparams\TPWS'; % directory where you want to save your TPWS files
+siteName = 'USWTRTest'; % site name, only used to name the output file
+ppThresh = 0; % minimum RL in dBpp. If detections have RL below this
 % threshold, they will be excluded from the output file. Useful if you have
 % an unmanageable number of detections.
 
@@ -54,7 +54,7 @@ for itr0 = 1:length(dirSet)
         for itr2 = 1:lfs
             thisFile = fileSet.mat(itr2);
             
-            load(char(fullfile(inDir,thisFile)),'-mat','pos','rawStart',...
+            load(fullfile(inDir,char(thisFile)),'-mat','pos','rawStart',...
                 'ppSignal','specClickTf','fs','yFilt')
             
             if ~isempty(pos)
@@ -62,13 +62,28 @@ for itr0 = 1:length(dirSet)
                 keepers = find(ppSignal >= ppThresh);
                 ppSignal = ppSignal(keepers);
                 pos = pos(keepers,:);
-                fileStart = datenum(rawStart(1,:)); 
-                
-                % ATTN: Calculating detection times.
-                % This assumes that times in the position vector "pos" 
-                % are relative to the start time of the first raw file. 
-                posDnum = (pos(:,1)/(60*60*24)) + fileStart +...
-                    datenum([2000,0,0,0,0,0]);
+                rawIdxStart = floor(pos(:,1)./75);
+                % rawIdx start should go from 0 to 29, since there are 30
+                % raw files per .xwav. However, sometimes it's going to 30.
+                % This shouldn't happen? It may be a rounding error in the
+                % conversion of rawStart to a date vector (lose decimal
+                % seconds?)
+                % If this happens, assume the last start
+                % time available in rawIdxStart is the right one to use
+                rawIdxStart(rawIdxStart>=size(rawStart,1)) = size(rawStart,1)-1; 
+
+                % create vector of raw file starts for each detection time:
+                rawStartDnum = datenum(rawStart);
+                % calculate detection times based on associated raw file start:
+                posDnum = (pos(:,1)-(rawIdxStart*75))/(24*60*60) + rawStartDnum(rawIdxStart+1);
+
+%                 fileStart = datenum(rawStart(1,:)); 
+%                 
+%                 % ATTN: Calculating detection times.
+%                 % This assumes that times in the position vector "pos" 
+%                 % are relative to the start time of the first raw file. 
+%                 posDnum = (pos(:,1)/(60*60*24)) + fileStart +...
+%                     datenum([2000,0,0,0,0,0]);
                 
                 % store to vectors:
                 MTT = [MTT; posDnum];
@@ -90,12 +105,13 @@ for itr0 = 1:length(dirSet)
         
         fprintf('Done with directory %d of %d \n',itr0,length(dirSet))
         
-        outFileName = sprintf('%s_%s_TPWS1.mat',siteName,dirSet(itr0).name);
+        outFileName = sprintf('%s_TPWS1.mat',dirSet(itr0).name);    %changed was outFileName = sprintf('%s_%s_TPWS1.mat',siteName,dirSet(itr0).name);
         save(fullfile(outDir,outFileName),'MTT','MPP','MSP','MSN','f',...
             '-v7.3')
-        MTT = [];
-        MPP = [];
-        MSP = [];
-        MSN = [];
     end
+    
+    MTT = [];
+    MPP = [];
+    MSP = [];
+    MSN = [];
 end

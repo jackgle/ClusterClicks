@@ -1,5 +1,7 @@
 % cluster_bins
+
 % Cluster clicks in n-minute bins by spectral similarities using Gephi API
+
 %%% INPUT:
 % Directory of TPWS files. These need to include frequency vector
 % associated with spectra, or add your freq vector to script.
@@ -28,11 +30,11 @@ classPathVar = ' E:\workspace\ClusterGephi_sio\bin';
 toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolkit.jar';
 
 %%% set inputs and setting values
-siteName = 'HAT'; % First few letters of TPWS file names
+siteName = 'HAT03A'; % First few letters of TPWS file names
 
 % directory where those TPWS files live
-inDir = 'I:\HAT\TPWS';
-outDir = 'I:\HAT\ClusterBins';
+inDir = 'H:\HAT02-03A\TPWS';
+outDir = 'H:\HAT02-03A\TPWS\ClusterBins_FPincluded';
 
 %pruneItrVals = fliplr([70,80,90,95,97,99]);
 %for iPrune = length(pruneItrVals)
@@ -42,7 +44,7 @@ p.minClust = 100; % minimum number of clicks required for a cluster to be retain
 % Think about how fast your species click, group sizes, and how many clicks they make
 % per N minutes...
 %p.pruneThr = pruneItrVals(iPrune);
-p.pruneThr = 97; % Percentage of edges between nodes that you want to prune.
+p.pruneThr = 98; % Percentage of edges between nodes that you want to prune.
 % Pruning speeds up clustering, but can result in isolation (therefore
 % loss) of rare click types.
 p.pgThresh = 0; % Percentile of nodes to remove from metwork using PageRank weights.
@@ -56,7 +58,7 @@ p.modular = 0; % if you use a number other than 0, modularity algorithm will be 
 
 p.plotFlag = 0; % Want plots? Turn this off for large jobs, but useful for
 % seeing how your clusters are coming out when choosing parameters above.
-p.falseRM = 1; % Want to remove false positives? Working on removing the 
+p.falseRM = 0; % Want to remove false positives? Working on removing the 
 % need for manual false positive ID step.
 
 %%% Frequencies you want to compare clicks across:
@@ -87,7 +89,7 @@ p.maxNetworkSz = 5000; % maximum # of clicks allowed in a network.
 % will be selected for clustering. Your computer will need to handle
 % maxNetworkSz^2 edges, so more RAM -> larger networks.
 
-
+colormap(jet)
 
 %% Begin calculations
 cd(inDir);
@@ -147,8 +149,8 @@ for itr = 1:length(ttppNames)
         outName = strrep(thisFile,'TPWS1',sprintf('clusters_diff_PG%d_PR%d_MIN%d_MOD%d_PPmin%d%s',...
             p.pgThresh, p.pruneThr, p.minClust, p.modular,p.ppThresh,falseStr));
     else
-        outName = strrep(thisFile,'TPWS1',sprintf('clusters_PG%d_PR%d_MIN%d_MOD%d%s',...
-            p.pgThresh, p.pruneThr, p.minClust, p.modular,falseStr));
+        outName = strrep(thisFile,'TPWS1',sprintf('clusters_PG%d_PR%d_MIN%d_MOD%d%s_PPmin%d%s',...
+            p.pgThresh, p.pruneThr, p.minClust, p.modular,p.ppThresh,falseStr));
     end
     % remove false positive clicks
     [~, keepIdx] = setdiff(MTT,fdAll);
@@ -284,6 +286,7 @@ for itr = 1:length(ttppNames)
                     ylabel('Frequency (kHz)','Fontsize',12)
                     xlabel('Click Number','Fontsize',12)
                     % pause
+                    drawnow
                     1;
                 end
             else

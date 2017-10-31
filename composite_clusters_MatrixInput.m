@@ -5,10 +5,10 @@
 % ** Run this on the output from cluster_bins **
 clearvars
 
-siteName = 'mergedHAT_subset_8000nodes_min200';%'MC_GC_DT_MP_DC_autoCluster_95_2000ofEach_1-121_diff_maxdiff';
-inDir = 'I:\HAT\ClusterBins';%'F:\GOM_clickTypePaper_detections\TPWS\MC_GC_DTmerge';
+siteName = 'mergedHAT_subset_8000nodes_min200_test';%'MC_GC_DT_MP_DC_autoCluster_95_2000ofEach_1-121_diff_maxdiff';
+inDir = 'H:\HAT02-04A\ClusterBins';%'F:\GOM_clickTypePaper_detections\TPWS\MC_GC_DTmerge';
 inFile = 'mergedHAT_subset_8000nodes_min200';%'MC_GC_DT_MP_DC_autoCluster_95_2000ofEach_1-121_diff'; %'MC_GC_DT_01-02_autoCluster_90_2000ofEach.mat';
-outDir = 'I:\HAT\ClusterBins';
+outDir = 'H:\HAT02-04A\ClusterBins';
 
 % Gephi and Java paths:
 javaPathVar = 'C:\Program Files\Java\jre6\bin\java.exe';
