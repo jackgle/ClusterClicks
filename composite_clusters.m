@@ -6,10 +6,10 @@
 
 clearvars
 
-siteName = 'HAT02-03_auto_5_pgThres'; % used to name output files
-inDir = 'H:\HAT02-03A\ClusterBins'; 
-inFile = 'HAT02and3A_cluster_bins';%'MC_GC_DT_01-02_autoCluster_90_2000ofEach.mat';
-outDir = 'H:\HAT02-03A\ClusterBins\Temp';
+siteName = 'JAX11D_PG0_PR98'; % used to name output files
+inDir = 'D:\JAX11D\TPWS\ClusterBins_FPincluded'; 
+inFile = 'JAX11D_disk08_Delphin_clusters_diff_PG0_PR98_MIN25_MOD0_PPmin120_FPincl';%'MC_GC_DT_01-02_autoCluster_90_2000ofEach.mat';
+outDir = 'D:\JAX11D\TPWS\ClusterBins_FPincluded';
 
 % Gephi and Java paths:
 javaPathVar = 'C:\Program Files\Java\jre6\bin\java.exe';
@@ -20,14 +20,21 @@ saveOutput = 1; %set to 1 to save output file and figs, else 0
 
 %%%% Similarity %%%%
 % choose if you want to include ICI **OR** click rate in similarity calculation
-iciTF = 1; % 1 if you want to use ICI (time between clicks)
+iciModeTF = 1; % 1 if you want to use modal ICI (time between clicks)
+%OR
+iciDistTF = 0;% 1 if you want to compare ici distributions
+%OR
 cRateTF = 0; % 1 if you want to use click rate (# of clicks per second)
+%%%
+correctForSaturation = 1; % 1 if you want to look for minor ICI peaks in 
+% cases where clicking is so dense that individual ICIs are obscured. This
+% helps with dolphins, but may hurt if you are trying to pull out ships and
+% rain too. Only for modal ICI
 specDiffTF = 1; % set to 1 to use spectral 1st derivatives for correlation
-
 %%%% Distribution Pruning %%%%
-p.stIdx = 1;
-p.edIdx = 121;
-maxICI = 31;
+p.stIdx = 5;
+p.edIdx = 190;
+maxICI = 61;
 minICI = 1;
 
 %%%% Clustering %%%%
@@ -38,7 +45,7 @@ pgThresh = 0; % Percentile of nodes to remove from network using PageRank weight
 % pruned out.
 modular = 0; % If you use a number other than 0, modularity algorithm will
 % be used instead of chinese whispers. Not recommended.
-maxClust = 5000;% maximum number of bins to cluster. If you have more than
+maxClust = 10000;% maximum number of bins to cluster. If you have more than
 % this, a random subset of this size will be selected.
 subSampOnlyOnce = 1; % if your input contains more than maxClust clicks, they 
 % will be subsampled. If subSampOnlyOnce = 1, then a subsample will
@@ -49,7 +56,9 @@ subSampOnlyOnce = 1; % if your input contains more than maxClust clicks, they
 % N iterations. This looks at more signals, but risks that the final
 % clusters will be chosen from the subset that happened to have the least
 % variability.
-
+minClicks = 50; % minimum number of clicks per bin that you want to consider
+% higher number makes cleaner clusters, but may miss things that click
+% slowly.
 
 % Number of clusterings to use for evidence accumulation
 N = 10; % bigger is theoretically more robust, but takes longer
@@ -76,11 +85,13 @@ inFileStub = siteName;
 % Put click spectra into a matrix
 if iscell(sumSpec)
     sumSpecMat = vertcat(sumSpec{:});
+    nSpecMat = horzcat(nSpec{:})';
 else
     sumSpecMat = sumSpec;
+    nSpecMat = nSpec;
 end
-
-[specNorm,diffNormSpec] = spec_norm_diff(sumSpecMat,p.stIdx,p.edIdx);
+useBins = nSpecMat>=minClicks;
+[specNorm,diffNormSpec] = spec_norm_diff(sumSpecMat(useBins,:),p.stIdx,p.edIdx);
 
 % ICIs:
 % move ICI distributions into a matrix and normalize.
@@ -100,7 +111,7 @@ if iscell(dTT)
 else
     dTTmat = dTT;
 end
-dTTmat = dTTmat(:,1:maxICI); % truncate if needed to ignore high ici peaks
+dTTmat = dTTmat(useBins,1:maxICI); % truncate if needed to ignore high ici peaks
 dTTmatNorm1 = dTTmat./repmat(sum(dTTmat,2),1,size(dTTmat,2));
 dTTmatNorm = dTTmatNorm1./repmat(max(dTTmatNorm1,[],2),1,size(dTTmat,2));
 
@@ -108,20 +119,38 @@ dTTmatNorm = dTTmatNorm1./repmat(max(dTTmatNorm1,[],2),1,size(dTTmat,2));
 % clicking.
 % find dTT rows where first bin is largest
 [~,iciModeIdx] = max(dTTmatNorm(:,minICI:end),[],2);
-saturatedSet = find(iciModeIdx <= 3);
 
-for iSat = 1:length(saturatedSet)
-    thisDTTsmoothDiff = diff(dTTmatNorm(saturatedSet(iSat),1:end));
-    minIdx = find(thisDTTsmoothDiff(2:end)>0, 1,'first')+1;
-    if isempty(minIdx)
-        minIdx = 1;
+% find secondary ICI peak in saturated ICI distributions
+if correctForSaturation
+    saturatedSet = find(iciModeIdx <= 3);
+    
+    for iSat = 1:length(saturatedSet)
+        thisDTTsmoothDiff = diff(dTTmatNorm(saturatedSet(iSat),1:maxICI));
+        minIdx = find(thisDTTsmoothDiff(2:end)>0, 1,'first')+1;
+        if isempty(minIdx)
+            minIdx = 1;
+        end
+        trucatedICIDist = dTTmatNorm(saturatedSet(iSat),minIdx:maxICI);
+        trucatedICIDistNorm = trucatedICIDist/max(trucatedICIDist);
+
+        [mVal,mTemp] = max(trucatedICIDistNorm,[],2);
+        % compute rough peak prominence metric
+        if mVal>1
+        peakProm = mVal-((trucatedICIDistNorm(mTemp-1)+...
+            trucatedICIDistNorm(mTemp+1))/2);
+        elseif mVal==1
+            peakProm = mVal-(trucatedICIDistNorm(mTemp+1)/2);
+        elseif mVal == length(trucatedICIDistNorm)
+            peakProm = mVal-(trucatedICIDistNorm(mTemp-1)/2);
+        end
+        if peakProm>.2 && sum(trucatedICIDist)>.5% don't adjust unless the peak is strong enough
+            iciModeIdx(saturatedSet(iSat)) = minIdx+mTemp-1;
+        end
+%         figure(1);clf;
+%         plot(iciModeIdx(saturatedSet(iSat)),mVal,'*');
+%         hold on;plot(dTTmatNorm(saturatedSet(iSat),:));plot([0,40],[0,0],'r');
+%         plot(thisDTTsmoothDiff,'g');hold off
     end
-    [mVal,mTemp] = max(dTTmatNorm(saturatedSet(iSat),minIdx:end),[],2);
-    iciModeIdx(saturatedSet(iSat)) = minIdx+mTemp-1;
-%     figure(1);clf;
-%     plot(iciModeIdx(saturatedSet(iSat)),mVal,'*');
-%     hold on;plot(dTTmatNorm(saturatedSet(iSat),:));plot([0,40],[0,0],'r');
-%     plot(thisDTTsmoothDiff,'g');hold off
 end
 iciModes = p.barInt(iciModeIdx+minICI) + p.barInt(2)./2;
 % [iciDist,~,~] = ici_dist(dTTmatNorm);
@@ -140,7 +169,9 @@ if iscell(clickRate)
 else
     cRateMat = clickRate;
 end
-cRateNorm1 = cRateMat./repmat(sum(cRateMat,2),1,size(cRateMat,2));
+cRateMat = cRateMat(useBins,:);
+cRateNorm1 = cRateMat./repmat(sum(cRateMat,2),1,...
+    size(cRateMat,2));
 cRateNorm = cRateNorm1./repmat(max(cRateNorm1,[],2),1,size(cRateMat,2));
 [~,cRateModeIdx] = max(cRateNorm,[],2);
 cRateModes = p.barRate(cRateModeIdx) + p.barRate(2)./2;
@@ -176,10 +207,15 @@ for iEA = 1:N
             [specDist,~,~] = spectra_dist(specNorm(excludedIn,p.stIdx:p.edIdx));
         end
         
-        if iciTF % if true, use ici distributions for similarity calculations
-            [iciDist,~,~,~] = ici_dist_mode(iciModes(excludedIn),p.barInt(maxICI));
-            compDist = squareform(specDist.*iciDist,'tomatrix');
+        if iciModeTF % if true, use ici distributions for similarity calculations
+            [iciModeDist,~,~,~] = ici_dist_mode(iciModes(excludedIn),p.barInt(maxICI));
+            compDist = squareform(specDist.*iciModeDist,'tomatrix');
             disp('Clustering on modal ICI and spectral correlations')
+        elseif iciDistTF
+             % if true, use ici distributions for similarity calculations
+            [iciDist,~,~] = ici_dist(dTTmatNorm(excludedIn,minICI:maxICI));
+            compDist = squareform(specDist.*iciDist,'tomatrix');
+            disp('Clustering on ICI distribution and spectral correlations')
         elseif cRateTF
             % use click rate distributions for similarity calculations
             [cRateDist,~,~] = ici_dist(cRateNorm(excludedIn,:));
@@ -259,7 +295,7 @@ if subPlotSet
         subplot(n1,m1,iF)
         hold on
         plot(f,spectraMeanSet(iF,:),'-k','lineWidth',2)
-        xlim([min(f),65])
+        xlim([min(f),max(f)])
         legend(num2str(size(nodeSet{iF},2)),'location','Southeast')
         plot(f,specPrctile{iF},'--k','lineWidth',2)
         grid on
@@ -268,7 +304,7 @@ if subPlotSet
         subplot(n1,m1,iF)
         imagesc(1:length(nodeSet{iF}),f,specNorm(nodeSet{iF},:)')
         set(gca,'ydir','normal')
-        ylim([min(f),65])
+        ylim([min(f),max(f)])
         
         figure(80) % plot ICI distributions
         subplot(n1,m1,iF)
@@ -408,7 +444,7 @@ end
 if saveOutput
     save(fullfile(outDir,[inFileStub,'_typesHR']),'Tfinal','nodeSet','NMIList',...
         'p','maxClust','minClust','maxICI','barAdj','f','siteName','nList','ka','naiItr',...
-        'iciTF','cRateTF','isolated','p','maxICI','minICI',...
+        'iciDistTF','iciModeTF','cRateTF','isolated','p','maxICI','minICI',...
         'pruneThr','pgThresh','modular','N','cInt','dTT','sumSpec','tInt',...
         'percSpec','nSpec','clickRate','specNorm','dTTmatNorm','cRateNorm','inFileName')
 end

@@ -21,73 +21,13 @@
 % but data is stored cumulatively, so if all goes well, you only need the
 % last (biggest) file.
 % kef 10/14/2016
-%%
+%% Setup
 clearvars
 
-%%% Java/Gephi toolkit setup
-javaPathVar = 'C:\Program Files\Java\jre6\bin\java.exe';
-classPathVar = ' E:\workspace\ClusterGephi_sio\bin';
-toolkitPath = 'E:\workspace\ClusterGephi_sio\gephi-toolkit-0.8.7-all\gephi-toolkit.jar';
-
-%%% set inputs and setting values
-siteName = 'HAT03A'; % First few letters of TPWS file names
-
-% directory where those TPWS files live
-inDir = 'H:\HAT02-03A\TPWS';
-outDir = 'H:\HAT02-03A\TPWS\ClusterBins_FPincluded';
-
-%pruneItrVals = fliplr([70,80,90,95,97,99]);
-%for iPrune = length(pruneItrVals)
-
-%%% Clustering parameter choices
-p.minClust = 100; % minimum number of clicks required for a cluster to be retained.
-% Think about how fast your species click, group sizes, and how many clicks they make
-% per N minutes...
-%p.pruneThr = pruneItrVals(iPrune);
-p.pruneThr = 98; % Percentage of edges between nodes that you want to prune.
-% Pruning speeds up clustering, but can result in isolation (therefore
-% loss) of rare click types.
-p.pgThresh = 0; % Percentile of nodes to remove from metwork using PageRank weights.
-% e.g. If you use 25, nodes with PR in the lowest 25th percentile will be
-% pruned out.
-p.modular = 0; % if you use a number other than 0, modularity algorithm will be used
-% instead of chinese whispers for community detection. Not recommended.
-% In the modularity algorithm, this parameter influences the number of
-% communities detected. 1 = no bias, >1 bias toward fewer communities, <1,
-% bias toward more communities.
-
-p.plotFlag = 0; % Want plots? Turn this off for large jobs, but useful for
-% seeing how your clusters are coming out when choosing parameters above.
-p.falseRM = 0; % Want to remove false positives? Working on removing the 
-% need for manual false positive ID step.
-
-%%% Frequencies you want to compare clicks across:
-% comparing across the full bandwidth tends to reduce differences between click
-% types. Results are typically better if you focus comparing the region
-% where frequencies differ most.
-p.stIdx = 1; % index of start freq in vector "f" from TPWS
-p.edIdx = 121; % index of end freq
-
-%%% Vectors to use for binning ICI and click rate
-p.barInt = 0:.01:.5; % ICI bins in seconds (minICI:resolution:maxICI)
-p.barRate = 1:1:30; % click rate in clicks per second (minRate:resolution:maxRate)
-
-p.diff = 1;% compare first derivative of spectra if 1. If 0 spectra will be compared normally.
-
-% Option to enforce a minimum recieved level (dB peak to peak), and only
-% cluster high-amplitude clicks, which tend to have cleaner spectra.
-p.ppThresh = 120;
-
-%%% Time bins: clicks are clustered by time bin. How long of a bin do you
-% want to consider?
-% Larger bins -> more clicks, better representation for slow clicking species.
-% But large time bins mean more click counts -> longer computation times,
-% or subsampling
-p.timeStep = 5; % bin duration in mins
-p.maxNetworkSz = 5000; % maximum # of clicks allowed in a network.
-% If there are more clicks in a time bin than this number, a random subset
-% will be selected for clustering. Your computer will need to handle
-% maxNetworkSz^2 edges, so more RAM -> larger networks.
+% modify cluster_bins_settings.m to import your site-specific preferences.
+% you can save different versions of cluster_bins_settings, so you don't
+% have to overwrite old settings. (TODO: add diary).
+[siteName, inDir, outDir, p] = cluster_bins_settings;
 
 colormap(jet)
 
@@ -198,7 +138,7 @@ for itr = 1:length(ttppNames)
             
             % Cluster
             [spectraMean,clickAssign,~,specHolder,isolated] = cluster_clicks(specSet,...
-                p,javaPathVar,classPathVar,toolkitPath);
+                p,p.javaPathVar,p.classPathVar,p.toolkitPath);
             
             % If you finish clustering with populated cluster(s)
             if ~isempty(clickAssign)
@@ -247,21 +187,21 @@ for itr = 1:length(ttppNames)
                     ylim([min(min(spectraMean)),max(max(spectraMean))])
                     hold off
                     box on
-                    xlim([10,70])
+                    xlim([f(p.stIdx),f(p.edIdx)])
                     ylabel('Normalized Amplitude','Fontsize',12)
                     xlabel('Frequency (kHz)','Fontsize',12)
                     
                     % Plot ICI distribution
                     subplot(2,2,3)
                     plot(p.barInt,dtt)
-                    xlim([0,.4])
+                    xlim([min(p.barInt),max(p.barInt)])
                     ylabel('Counts','Fontsize',12)
                     xlabel('ICI (sec)','Fontsize',12)
                     
                     % Plot click rate distribution
                     subplot(2,2,4)
                     plot(p.barRate,cRate)
-                    xlim([0,30])                   
+                    xlim([min(p.barRate),max(p.barRate)])                   
                     ylabel('Counts','Fontsize',12)
                     xlabel('Click Rate (clicks/sec)','Fontsize',12)
                     

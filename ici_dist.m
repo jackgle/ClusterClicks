@@ -1,5 +1,5 @@
-function [distClickE, rows1,cols1] = ici_dist(iciMat)
-iciNorm = iciMat./repmat(sum(iciMat,2),1,size(iciMat,2));
+function [distClickE, rows1,cols1] = ici_dist(iciNorm)
+%iciNorm = iciMat./repmat(sum(iciMat,2),1,size(iciMat,2));
 
 tempN = size(iciNorm,1);
 offaxN = ((tempN.^2)-tempN)./2;
