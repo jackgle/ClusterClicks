@@ -83,13 +83,14 @@ if s.correctForSaturation
         trucatedICIDistNorm = trucatedICIDist/max(trucatedICIDist);
 
         [mVal,mTemp] = max(trucatedICIDistNorm,[],2);
+        
         % compute rough peak prominence metric
-        if mVal>1
-        peakProm = mVal-((trucatedICIDistNorm(mTemp-1)+...
-            trucatedICIDistNorm(mTemp+1))/2);
-        elseif mVal==1
+        if mTemp>1 && mTemp<length(trucatedICIDistNorm)
+            peakProm = mVal-((trucatedICIDistNorm(mTemp-1)+...
+                trucatedICIDistNorm(mTemp+1))/2);
+        elseif mTemp == 1
             peakProm = mVal-(trucatedICIDistNorm(mTemp+1)/2);
-        elseif mVal == length(trucatedICIDistNorm)
+        elseif mTemp == length(trucatedICIDistNorm)
             peakProm = mVal-(trucatedICIDistNorm(mTemp-1)/2);
         end
         if peakProm>.2 && sum(trucatedICIDist)>.5% don't adjust unless the peak is strong enough
@@ -136,7 +137,7 @@ for iEA = 1:s.N
     if size(cRateMat,1)> s.maxClust
         subSamp = 1;
         excludedIn = sort(randperm(length(dTTmatNorm), s.maxClust));
-        fprintf('Max number of bins exceeded. Selecting random subset of %d\n',maxClust)
+        fprintf('Max number of bins exceeded. Selecting random subset of %d\n',s.maxClust)
         if s.subSampOnlyOnce
             % set flag back to zero if you only want to subsample once,
             % rather than taking a new subsample every time.

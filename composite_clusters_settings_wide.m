@@ -1,14 +1,14 @@
-function s = composite_clusters_settings
+function s = composite_clusters_settings_wide
 
 % Settings for running composite_clusters.m
 % Consider making separate versions to keep track of settings used on
 % different projects
 
 % File locations and names
-s.siteName = 'HAT02-03_auto_95_pgThres'; % used to name output files
-s.inDir = 'G:\HAT02-03A\ClusterBins'; 
-s.inFile = 'HAT02and3A_cluster_bins'; 
-s.outDir = 'G:\HAT02-03A\ClusterBins\Temp';
+s.siteName = 'JAX11D_PG0_PR98'; % used to name output files
+s.inDir = 'D:\JAX11D\TPWS\ClusterBins_FPincluded'; 
+s.inFile = 'JAX11D_disk08_Delphin_clusters_diff_PG0_PR98_MIN25_MOD0_PPmin120_FPincl';%'MC_GC_DT_01-02_autoCluster_90_2000ofEach.mat';
+s.outDir = 'D:\JAX11D\TPWS\ClusterBins_demotest';
 
 % Gephi and Java paths:
 s.javaPathVar = 'C:\Program Files\Java\jre6\bin\java.exe';
@@ -33,9 +33,9 @@ s.correctForSaturation = 1; % 1 if you want to look for minor ICI peaks in
 s.specDiffTF = 1; % set to 1 to use spectral 1st derivatives for correlation
 
 %%%% Distribution Pruning %%%%
-s.stIdx = 1;
-s.edIdx = 121;
-s.maxICI = 31;
+s.stIdx = 5;
+s.edIdx = 190;
+s.maxICI = 61;
 s.minICI = 1;
 
 %%%% Clustering %%%%
@@ -46,7 +46,7 @@ s.pgThresh = 0; % Percentile of nodes to remove from network using PageRank weig
 % pruned out.
 s.modular = 0; % If you use a number other than 0, modularity algorithm will
 % be used instead of chinese whispers. Not recommended.
-s.maxClust = 5000;% maximum number of bins to cluster. If you have more than
+s.maxClust = 10000;% maximum number of bins to cluster. If you have more than
 % this, a random subset of this size will be selected.
 s.subSampOnlyOnce = 1; % if your input contains more than maxClust clicks, they 
 % will be subsampled. If subSampOnlyOnce = 1, then a subsample will
