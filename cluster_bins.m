@@ -22,6 +22,7 @@
 % last (biggest) file.
 % kef 10/14/2016
 %% Setup
+
 clearvars
 
 % modify cluster_bins_settings.m to import your site-specific preferences.
